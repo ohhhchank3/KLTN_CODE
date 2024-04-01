@@ -1,6 +1,7 @@
-from server.db.models.knowledge_metadata_model import SummaryChunkModel
-from server.db.session import with_session
-from typing import List, Dict
+from typing import Dict, List
+
+from backend.db.models.knowledge_metadata_model import SummaryChunkModel
+from backend.db.session import with_session
 
 
 @with_session
@@ -9,13 +10,13 @@ def list_summary_from_db(session,
                          metadata: Dict = {},
                          ) -> List[Dict]:
     '''
-    列出某知识库chunk summary。
-    返回形式：[{"id": str, "summary_context": str, "doc_ids": str}, ...]
+    Liệt kê các đoạn tóm tắt chunk từ cơ sở kiến thức.
+    Trả về dạng: [{"id": str, "summary_context": str, "doc_ids": str}, ...]
     '''
     docs = session.query(SummaryChunkModel).filter(SummaryChunkModel.kb_name.ilike(kb_name))
 
     for k, v in metadata.items():
-        docs = docs.filter(SummaryChunkModel.meta_data[k].as_string() == str(v))
+        docs = docs.filter(SummaryChunkModel.meta_data[k].astext == str(v))
 
     return [{"id": x.id,
              "summary_context": x.summary_context,
@@ -29,8 +30,8 @@ def delete_summary_from_db(session,
                            kb_name: str
                            ) -> List[Dict]:
     '''
-    删除知识库chunk summary，并返回被删除的Dchunk summary。
-    返回形式：[{"id": str, "summary_context": str, "doc_ids": str}, ...]
+    Xóa các đoạn tóm tắt chunk từ cơ sở kiến thức và trả về các đoạn tóm tắt đã bị xóa.
+    Trả về dạng: [{"id": str, "summary_context": str, "doc_ids": str}, ...]
     '''
     docs = list_summary_from_db(kb_name=kb_name)
     query = session.query(SummaryChunkModel).filter(SummaryChunkModel.kb_name.ilike(kb_name))
@@ -44,8 +45,8 @@ def add_summary_to_db(session,
                       kb_name: str,
                       summary_infos: List[Dict]):
     '''
-    将总结信息添加到数据库。
-    summary_infos形式：[{"summary_context": str, "doc_ids": str}, ...]
+    Thêm thông tin tóm tắt vào cơ sở dữ liệu.
+    summary_infos có dạng: [{"summary_context": str, "doc_ids": str}, ...]
     '''
     for summary in summary_infos:
         obj = SummaryChunkModel(

@@ -25,7 +25,6 @@ class ConversationBufferDBMemory(BaseChatMemory):
         # fetch limited messages desc, and return reversed
 
         messages = filter_message(conversation_id=self.conversation_id, limit=self.message_limit)
-        # 返回的记录按时间倒序，转为正序
         messages = list(reversed(messages))
         chat_messages: List[BaseMessage] = []
         for message in messages:

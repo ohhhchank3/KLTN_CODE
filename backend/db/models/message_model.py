@@ -5,21 +5,21 @@ from backend.db.base import Base
 
 class MessageModel(Base):
     """
-    聊天记录模型
+    Mô hình bản ghi cuộc trò chuyện
     """
     __tablename__ = 'message'
-    id = Column(String(32), primary_key=True, comment='聊天记录ID')
-    conversation_id = Column(String(32), default=None, index=True, comment='对话框ID')
-    # chat/agent_chat等
-    chat_type = Column(String(50), comment='聊天类型')
-    query = Column(String(4096), comment='用户问题')
-    response = Column(String(4096), comment='模型回答')
-    # 记录知识库id等，以便后续扩展
+    id = Column(String(32), primary_key=True, comment='ID Bản ghi cuộc trò chuyện')
+    conversation_id = Column(String(32), default=None, index=True, comment='ID Cuộc trò chuyện')
+    # chat/agent_chat và các loại khác
+    chat_type = Column(String(50), comment='Loại Cuộc trò chuyện')
+    query = Column(String(4096), comment='Câu hỏi của người dùng')
+    response = Column(String(4096), comment='Phản hồi từ mô hình')
+    # Lưu trữ thông tin như ID của cơ sở kiến thức để mở rộng sau này
     meta_data = Column(JSON, default={})
-    # 满分100 越高表示评价越好
-    feedback_score = Column(Integer, default=-1, comment='用户评分')
-    feedback_reason = Column(String(255), default="", comment='用户评分理由')
-    create_time = Column(DateTime, default=func.now(), comment='创建时间')
+    # Điểm đánh giá, điểm càng cao tức là đánh giá càng tốt
+    feedback_score = Column(Integer, default=-1, comment='Điểm đánh giá từ người dùng')
+    feedback_reason = Column(String(255), default="", comment='Lý do đánh giá từ người dùng')
+    create_time = Column(DateTime, default=func.now(), comment='Thời gian Tạo')
 
     def __repr__(self):
         return f"<message(id='{self.id}', conversation_id='{self.conversation_id}', chat_type='{self.chat_type}', query='{self.query}', response='{self.response}',meta_data='{self.meta_data}',feedback_score='{self.feedback_score}',feedback_reason='{self.feedback_reason}', create_time='{self.create_time}')>"

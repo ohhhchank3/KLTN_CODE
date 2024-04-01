@@ -1,8 +1,10 @@
-from server.db.models.knowledge_base_model import KnowledgeBaseModel
-from server.db.models.knowledge_file_model import KnowledgeFileModel, FileDocModel
-from server.db.session import with_session
-from server.knowledge_base.utils import KnowledgeFile
-from typing import List, Dict
+from typing import Dict, List
+
+from backend.db.models.knowledge_base_model import KnowledgeBaseModel
+from backend.db.models.knowledge_file_model import (FileDocModel,
+                                                    KnowledgeFileModel)
+from backend.db.session import with_session
+from backend.knowledge_base.utils import KnowledgeFile
 
 
 @with_session
@@ -11,8 +13,8 @@ def list_file_num_docs_id_by_kb_name_and_file_name(session,
                                                    file_name: str,
                                                    ) -> List[int]:
     '''
-    列出某知识库某文件对应的所有Document的id。
-    返回形式：[str, ...]
+    Liệt kê tất cả các ID tài liệu của một tệp trong một cơ sở kiến thức cụ thể.
+    Trả về dạng: [int, ...]
     '''
     doc_ids = session.query(FileDocModel.doc_id).filter_by(kb_name=kb_name, file_name=file_name).all()
     return [int(_id[0]) for _id in doc_ids]
@@ -25,14 +27,14 @@ def list_docs_from_db(session,
                       metadata: Dict = {},
                       ) -> List[Dict]:
     '''
-    列出某知识库某文件对应的所有Document。
-    返回形式：[{"id": str, "metadata": dict}, ...]
+    Liệt kê tất cả các tài liệu của một tệp trong một cơ sở kiến thức cụ thể.
+    Trả về dạng: [{"id": str, "metadata": dict}, ...]
     '''
     docs = session.query(FileDocModel).filter(FileDocModel.kb_name.ilike(kb_name))
     if file_name:
         docs = docs.filter(FileDocModel.file_name.ilike(file_name))
     for k, v in metadata.items():
-        docs = docs.filter(FileDocModel.meta_data[k].as_string() == str(v))
+        docs = docs.filter(FileDocModel.meta_data[k].astext == str(v))
 
     return [{"id": x.doc_id, "metadata": x.metadata} for x in docs.all()]
 
@@ -43,8 +45,8 @@ def delete_docs_from_db(session,
                         file_name: str = None,
                         ) -> List[Dict]:
     '''
-    删除某知识库某文件对应的所有Document，并返回被删除的Document。
-    返回形式：[{"id": str, "metadata": dict}, ...]
+    Xóa tất cả các tài liệu của một tệp trong một cơ sở kiến thức cụ thể và trả về các tài liệu đã bị xóa.
+    Trả về dạng: [{"id": str, "metadata": dict}, ...]
     '''
     docs = list_docs_from_db(kb_name=kb_name, file_name=file_name)
     query = session.query(FileDocModel).filter(FileDocModel.kb_name.ilike(kb_name))
@@ -61,12 +63,11 @@ def add_docs_to_db(session,
                    file_name: str,
                    doc_infos: List[Dict]):
     '''
-    将某知识库某文件对应的所有Document信息添加到数据库。
-    doc_infos形式：[{"id": str, "metadata": dict}, ...]
+    Thêm thông tin tất cả các tài liệu của một tệp trong một cơ sở kiến thức cụ thể vào cơ sở dữ liệu.
+    doc_infos có dạng: [{"id": str, "metadata": dict}, ...]
     '''
-    # ! 这里会出现doc_infos为None的情况，需要进一步排查
     if doc_infos is None:
-        print("输入的server.db.repository.knowledge_file_repository.add_docs_to_db的doc_infos参数为None")
+        print("Tham số 'doc_infos' của hàm 'add_docs_to_db' là None")
         return False
     for d in doc_infos:
         obj = FileDocModel(
@@ -96,11 +97,10 @@ def add_file_to_db(session,
                    kb_file: KnowledgeFile,
                    docs_count: int = 0,
                    custom_docs: bool = False,
-                   doc_infos: List[Dict] = [],  # 形式：[{"id": str, "metadata": dict}, ...]
+                   doc_infos: List[Dict] = [],  # Dạng: [{"id": str, "metadata": dict}, ...]
                    ):
     kb = session.query(KnowledgeBaseModel).filter_by(kb_name=kb_file.kb_name).first()
     if kb:
-        # 如果已经存在该文件，则更新文件信息与版本号
         existing_file: KnowledgeFileModel = (session.query(KnowledgeFileModel)
                                              .filter(KnowledgeFileModel.kb_name.ilike(kb_file.kb_name),
                                                      KnowledgeFileModel.file_name.ilike(kb_file.filename))
@@ -114,7 +114,6 @@ def add_file_to_db(session,
             existing_file.docs_count = docs_count
             existing_file.custom_docs = custom_docs
             existing_file.file_version += 1
-        # 否则，添加新文件
         else:
             new_file = KnowledgeFileModel(
                 file_name=kb_file.filename,

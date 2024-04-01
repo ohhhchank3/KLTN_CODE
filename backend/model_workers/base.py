@@ -1,35 +1,38 @@
-from fastchat.conversation import Conversation
-from configs import LOG_PATH, TEMPERATURE
 import fastchat.constants
+from fastchat.conversation import Conversation
+
+from configs import LOG_PATH, TEMPERATURE
+
 fastchat.constants.LOGDIR = LOG_PATH
-from fastchat.serve.base_model_worker import BaseModelWorker
-import uuid
+import asyncio
 import json
 import sys
-from pydantic import BaseModel, root_validator
-import fastchat
-import asyncio
-from server.utils import get_model_worker_config
+import uuid
 from typing import Dict, List, Optional
 
+import fastchat
+from fastchat.serve.base_model_worker import BaseModelWorker
+from pydantic import BaseModel, root_validator
+
+from backend.utils import get_model_worker_config
 
 __all__ = ["ApiModelWorker", "ApiChatParams", "ApiCompletionParams", "ApiEmbeddingsParams"]
 
 
 class ApiConfigParams(BaseModel):
     '''
-    在线API配置参数，未提供的值会自动从model_config.ONLINE_LLM_MODEL中读取
+    Trình dự đoán cấu hình API trực tuyến, các giá trị không cung cấp sẽ tự động đọc từ model_config.ONLINE_LLM_MODEL.
     '''
     api_base_url: Optional[str] = None
     api_proxy: Optional[str] = None
     api_key: Optional[str] = None
     secret_key: Optional[str] = None
-    group_id: Optional[str] = None # for minimax
-    is_pro: bool = False # for minimax
+    group_id: Optional[str] = None  # cho minimax
+    is_pro: bool = False  # cho minimax
 
-    APPID: Optional[str] = None # for xinghuo
-    APISecret: Optional[str] = None # for xinghuo
-    is_v2: bool = False # for xinghuo
+    APPID: Optional[str] = None  # cho xinghuo
+    APISecret: Optional[str] = None  # cho xinghuo
+    is_v2: bool = False  # cho xinghuo
 
     worker_name: Optional[str] = None
 
@@ -55,13 +58,13 @@ class ApiConfigParams(BaseModel):
 
 class ApiModelParams(ApiConfigParams):
     '''
-    模型配置参数
+    Cấu hình mô hình
     '''
     version: Optional[str] = None
     version_url: Optional[str] = None
-    api_version: Optional[str] = None # for azure
-    deployment_name: Optional[str] = None # for azure
-    resource_name: Optional[str] = None # for azure
+    api_version: Optional[str] = None  # cho azure
+    deployment_name: Optional[str] = None  # cho azure
+    resource_name: Optional[str] = None  # cho azure
 
     temperature: float = TEMPERATURE
     max_tokens: Optional[int] = None
@@ -70,11 +73,11 @@ class ApiModelParams(ApiConfigParams):
 
 class ApiChatParams(ApiModelParams):
     '''
-    chat请求参数
+    Tham số yêu cầu chat
     '''
     messages: List[Dict[str, str]]
-    system_message: Optional[str] = None # for minimax
-    role_meta: Dict = {} # for minimax
+    system_message: Optional[str] = None  # cho minimax
+    role_meta: Dict = {}  # cho minimax
 
 
 class ApiCompletionParams(ApiModelParams):
@@ -84,11 +87,11 @@ class ApiCompletionParams(ApiModelParams):
 class ApiEmbeddingsParams(ApiConfigParams):
     texts: List[str]
     embed_model: Optional[str] = None
-    to_query: bool = False # for minimax
+    to_query: bool = False  # cho minimax
 
 
 class ApiModelWorker(BaseModelWorker):
-    DEFAULT_EMBED_MODEL: str = None # None means not support embedding
+    DEFAULT_EMBED_MODEL: str = None  # None nghĩa là không hỗ trợ nhúng
 
     def __init__(
         self,
@@ -103,13 +106,14 @@ class ApiModelWorker(BaseModelWorker):
         kwargs.setdefault("model_path", "")
         kwargs.setdefault("limit_worker_concurrency", 5)
         super().__init__(model_names=model_names,
-                        controller_addr=controller_addr,
-                        worker_addr=worker_addr,
-                        **kwargs)
-        import fastchat.serve.base_model_worker
+                         controller_addr=controller_addr,
+                         worker_addr=worker_addr,
+                         **kwargs)
         import sys
+
+        import fastchat.serve.base_model_worker
         self.logger = fastchat.serve.base_model_worker.logger
-        # 恢复被fastchat覆盖的标准输出
+        # Khôi phục đầu ra tiêu chuẩn bị bị ghi đè bởi fastchat
         sys.stdout = sys.__stdout__
         sys.stderr = sys.__stderr__
 
@@ -123,7 +127,6 @@ class ApiModelWorker(BaseModelWorker):
         if not no_register and self.controller_addr:
             self.init_heart_beat()
 
-
     def count_token(self, params):
         prompt = params["prompt"]
         return {"count": len(str(prompt)), "error_code": 0}
@@ -136,7 +139,7 @@ class ApiModelWorker(BaseModelWorker):
             if self._is_chat(prompt):
                 messages = self.prompt_to_messages(prompt)
                 messages = self.validate_messages(messages)
-            else: # 使用chat模仿续写功能，不支持历史消息
+            else:  # Sử dụng chức năng chat để giả lập tiếp tục viết, không hỗ trợ tin nhắn lịch sử
                 messages = [{"role": self.user_role, "content": f"please continue writing from here: {prompt}"}]
 
             p = ApiChatParams(
@@ -149,7 +152,7 @@ class ApiModelWorker(BaseModelWorker):
             for resp in self.do_chat(p):
                 yield self._jsonify(resp)
         except Exception as e:
-            yield self._jsonify({"error_code": 500, "text": f"{self.model_names[0]}请求API时发生错误：{e}"})
+            yield self._jsonify({"error_code": 500, "text": f"{self.model_names[0]} requesting API encountered an error: {e}"})
 
     def generate_gate(self, params):
         try:
@@ -159,73 +162,40 @@ class ApiModelWorker(BaseModelWorker):
         except Exception as e:
             return {"error_code": 500, "text": str(e)}
 
-
-    # 需要用户自定义的方法
+    # Các phương thức cần người dùng tự định nghĩa
 
     def do_chat(self, params: ApiChatParams) -> Dict:
         '''
-        执行Chat的方法，默认使用模块里面的chat函数。
-        要求返回形式：{"error_code": int, "text": str}
+        Thực hiện chức năng Chat, mặc định sử dụng hàm chat trong mô-đun.
+        Yêu cầu kết quả trả về: {"error_code": int, "text": str}
         '''
-        return {"error_code": 500, "text": f"{self.model_names[0]}未实现chat功能"}
-
-    # def do_completion(self, p: ApiCompletionParams) -> Dict:
-    #     '''
-    #     执行Completion的方法，默认使用模块里面的completion函数。
-    #     要求返回形式：{"error_code": int, "text": str}
-    #     '''
-    #     return {"error_code": 500, "text": f"{self.model_names[0]}未实现completion功能"}
+        return {"error_code": 500, "text": f"{self.model_names[0]} has not implemented chat functionality"}
 
     def do_embeddings(self, params: ApiEmbeddingsParams) -> Dict:
         '''
-        执行Embeddings的方法，默认使用模块里面的embed_documents函数。
-        要求返回形式：{"code": int, "data": List[List[float]], "msg": str}
+        Thực hiện chức năng Nhúng, mặc định sử dụng hàm embed_documents trong mô-đun.
+        Yêu cầu kết quả trả về: {"code": int, "data": List[List[float]], "msg": str}
         '''
-        return {"code": 500, "msg": f"{self.model_names[0]}未实现embeddings功能"}
+        return {"code": 500, "msg": f"{self.model_names[0]} has not implemented embeddings functionality"}
 
-    def get_embeddings(self, params):
-        # fastchat对LLM做Embeddings限制很大，似乎只能使用openai的。
-        # 在前端通过OpenAIEmbeddings发起的请求直接出错，无法请求过来。
-        print("get_embedding")
-        print(params)
-
-    def make_conv_template(self, conv_template: str = None, model_path: str = None) -> Conversation:
-        raise NotImplementedError
-
-    def validate_messages(self, messages: List[Dict]) -> List[Dict]:
-        '''
-        有些API对mesages有特殊格式，可以重写该函数替换默认的messages。
-        之所以跟prompt_to_messages分开，是因为他们应用场景不同、参数不同
-        '''
-        return messages
-
-
-    # help methods
-    @property
-    def user_role(self):
-        return self.conv.roles[0]
-
-    @property
-    def ai_role(self):
-        return self.conv.roles[1]
+    # Các phương thức hỗ trợ
 
     def _jsonify(self, data: Dict) -> str:
         '''
-        将chat函数返回的结果按照fastchat openai-api-server的格式返回
+        Chuyển kết quả trả về từ hàm chat sang định dạng fastchat openai-api-server
         '''
         return json.dumps(data, ensure_ascii=False).encode() + b"\0"
 
     def _is_chat(self, prompt: str) -> bool:
         '''
-        检查prompt是否由chat messages拼接而来
-        TODO: 存在误判的可能，也许从fastchat直接传入原始messages是更好的做法
+        Kiểm tra xem prompt có phải là kết hợp của tin nhắn chat không
         '''
         key = f"{self.conv.sep}{self.user_role}:"
         return key in prompt
 
     def prompt_to_messages(self, prompt: str) -> List[Dict]:
         '''
-        将prompt字符串拆分成messages.
+        Chia prompt thành các tin nhắn.
         '''
         result = []
         user_role = self.user_role

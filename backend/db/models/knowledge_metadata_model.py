@@ -1,26 +1,26 @@
-from sqlalchemy import Column, Integer, String, DateTime, Float, Boolean, JSON, func
+from sqlalchemy import (JSON, Boolean, Column, DateTime, Float, Integer,
+                        String, func)
 
 from backend.db.base import Base
 
 
 class SummaryChunkModel(Base):
     """
-    chunk summary模型，用于存储file_doc中每个doc_id的chunk 片段，
-    数据来源:
-        用户输入: 用户上传文件，可填写文件的描述，生成的file_doc中的doc_id，存入summary_chunk中
-        程序自动切分 对file_doc表meta_data字段信息中存储的页码信息，按每页的页码切分，自定义prompt生成总结文本，将对应页码关联的doc_id存入summary_chunk中
-    后续任务:
-        矢量库构建: 对数据库表summary_chunk中summary_context创建索引，构建矢量库，meta_data为矢量库的元数据（doc_ids）
-        语义关联： 通过用户输入的描述，自动切分的总结文本，计算
-        语义相似度
+    Mô hình tóm tắt chunk, được sử dụng để lưu trữ các đoạn chunk của mỗi doc_id trong file_doc,
+    Nguồn dữ liệu:
+        Đầu vào của người dùng: Người dùng tải lên tập tin, có thể điền mô tả về tập tin, tạo ra doc_id trong file_doc, lưu vào summary_chunk
+        Tự động chia nhỏ bởi chương trình: Từ thông tin trang trong trường meta_data của bảng file_doc, chia nhỏ theo trang, tạo văn bản tóm tắt từ prompt tự động, lưu doc_id tương ứng vào summary_chunk
+    Công việc tiếp theo:
+        Xây dựng cơ sở dữ liệu vector: Tạo chỉ mục cho summary_context trong bảng summary_chunk, xây dựng cơ sở dữ liệu vector, meta_data là dữ liệu siêu (doc_ids)
+        Liên kết ngữ nghĩa: Dựa trên mô tả do người dùng nhập vào, tóm tắt tự động được chia nhỏ, tính toán độ tương đồng ngữ nghĩa
 
     """
     __tablename__ = 'summary_chunk'
     id = Column(Integer, primary_key=True, autoincrement=True, comment='ID')
-    kb_name = Column(String(50), comment='知识库名称')
-    summary_context = Column(String(255), comment='总结文本')
-    summary_id = Column(String(255), comment='总结矢量id')
-    doc_ids = Column(String(1024), comment="向量库id关联列表")
+    kb_name = Column(String(50), comment='Tên cơ sở kiến thức')
+    summary_context = Column(String(255), comment='Văn bản tóm tắt')
+    summary_id = Column(String(255), comment='ID Vector tóm tắt')
+    doc_ids = Column(String(1024), comment="Danh sách liên kết ID vector")
     meta_data = Column(JSON, default={})
 
     def __repr__(self):

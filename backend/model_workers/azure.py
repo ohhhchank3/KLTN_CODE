@@ -1,12 +1,14 @@
-import sys
-import os
-from fastchat.conversation import Conversation
-from server.model_workers.base import *
-from server.utils import get_httpx_client
-from fastchat import conversation as conv
 import json
-from typing import List, Dict
-from configs import logger, log_verbose
+import os
+import sys
+from typing import Dict, List
+
+from fastchat import conversation as conv
+from fastchat.conversation import Conversation
+
+from backend.model_workers.base import *
+from backend.utils import get_httpx_client
+from configs.basic_config import log_verbose, logger
 
 
 class AzureWorker(ApiModelWorker):
@@ -15,8 +17,8 @@ class AzureWorker(ApiModelWorker):
             *,
             controller_addr: str = None,
             worker_addr: str = None,
-            model_names: List[str] = ["azure-api"],
-            version: str = "gpt-35-turbo",
+            model_names: List[str] = ["openai-api"],
+            version: str = "gpt-3.5-turbo",
             **kwargs,
     ):
         kwargs.update(model_names=model_names, controller_addr=controller_addr, worker_addr=worker_addr)
@@ -32,13 +34,12 @@ class AzureWorker(ApiModelWorker):
             max_tokens=params.max_tokens if params.max_tokens else None,
             stream=True,
         )
-        url = ("https://{}.openai.azure.com/openai/deployments/{}/chat/completions?api-version={}"
-               .format(params.resource_name, params.deployment_name, params.api_version))
+        url = "https://api.openai.com/v1/chat/completions"
         headers = {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'api-key': params.api_key,
-        }
+    "Content-Type": "application/json",
+    "Authorization": f"Bearer {params.api_key}"  # Thay YOUR_OPENAI_API_KEY_HERE bằng mã truy cập của bạn
+}
+    
 
         text = ""
         if log_verbose:
@@ -64,7 +65,7 @@ class AzureWorker(ApiModelWorker):
                                 }
                         print(text)
                     else:
-                        self.logger.error(f"请求 Azure API 时发生错误：{resp}")
+                        self.logger.error(f"OpenAI：{resp}")
 
     def get_embeddings(self, params):
         print("embedding")
@@ -83,13 +84,14 @@ class AzureWorker(ApiModelWorker):
 
 if __name__ == "__main__":
     import uvicorn
-    from server.utils import MakeFastAPIOffline
     from fastchat.serve.base_model_worker import app
+
+    from backend.utils import MakeFastAPIOffline
 
     worker = AzureWorker(
         controller_addr="http://127.0.0.1:20001",
-        worker_addr="http://127.0.0.1:21008",
+        worker_addr="http://127.0.0.1:21001",
     )
     sys.modules["fastchat.serve.model_worker"].worker = worker
     MakeFastAPIOffline(app)
-    uvicorn.run(app, port=21008)
+    uvicorn.run(app, port=21001)

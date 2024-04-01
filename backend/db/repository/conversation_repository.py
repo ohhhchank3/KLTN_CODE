@@ -1,12 +1,13 @@
-from server.db.session import with_session
 import uuid
-from server.db.models.conversation_model import ConversationModel
+
+from backend.db.models.conversation_model import ConversationModel
+from backend.db.session import with_session
 
 
 @with_session
 def add_conversation_to_db(session, chat_type, name="", conversation_id=None):
     """
-    新增聊天记录
+    Thêm bản ghi trò chuyện mới
     """
     if not conversation_id:
         conversation_id = uuid.uuid4().hex
