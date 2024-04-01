@@ -3,7 +3,7 @@ from typing import Dict, List, Tuple, Union
 from langchain.prompts.chat import ChatMessagePromptTemplate
 from pydantic import BaseModel, Field
 
-from configs import log_verbose, logger
+from configs.basic_config import log_verbose, logger
 
 
 class History(BaseModel):

@@ -1,39 +1,40 @@
-import json
 import asyncio
+import json
+from typing import AsyncIterable, List, Optional
 
 from fastapi import Body
-from sse_starlette.sse import EventSourceResponse
-from configs import LLM_MODELS, TEMPERATURE, HISTORY_LEN, Agent_MODEL
-
+from langchain.agents import AgentExecutor, LLMSingleActionAgent
 from langchain.chains import LLMChain
 from langchain.memory import ConversationBufferWindowMemory
-from langchain.agents import LLMSingleActionAgent, AgentExecutor
-from typing import AsyncIterable, Optional, List
+from sse_starlette.sse import EventSourceResponse
 
-from server.utils import wrap_done, get_ChatOpenAI, get_prompt_template
-from server.knowledge_base.kb_service.base import get_kb_details
-from server.agent.custom_agent.ChatGLM3Agent import initialize_glm3_agent
-from server.agent.tools_select import tools, tool_names
-from server.agent.callbacks import CustomAsyncIteratorCallbackHandler, Status
-from server.chat.utils import History
-from server.agent import model_container
-from server.agent.custom_template import CustomOutputParser, CustomPromptTemplate
+from backend.agent import model_container
+from backend.agent.callbacks import CustomAsyncIteratorCallbackHandler, Status
+from backend.agent.custom_agent.ChatGLM3Agent import initialize_glm3_agent
+from backend.agent.custom_template import (CustomOutputParser,
+                                           CustomPromptTemplate)
+from backend.agent.tools_select import tool_names, tools
+from backend.chat.utils import History
+from backend.knowledge_base.kb_service.base import get_kb_details
+from backend.utils import get_ChatOpenAI, get_prompt_template, wrap_done
+from configs.model_config import (HISTORY_LEN, LLM_MODELS, TEMPERATURE,
+                                  Agent_MODEL)
 
 
-async def agent_chat(query: str = Body(..., description="用户输入", examples=["恼羞成怒"]),
+async def agent_chat(query: str = Body(..., description="Người dùng nhập", examples=["Đánh một bài thơ"]),
                      history: List[History] = Body([],
-                                                   description="历史对话",
+                                                   description="Lịch sử trò chuyện",
                                                    examples=[[
-                                                       {"role": "user", "content": "请使用知识库工具查询今天北京天气"},
+                                                       {"role": "user", "content": "Hãy sử dụng công cụ kiểm tra thời tiết hôm nay ở Bắc Kinh"},
                                                        {"role": "assistant",
-                                                        "content": "使用天气查询工具查询到今天北京多云，10-14摄氏度，东北风2级，易感冒"}]]
+                                                        "content": "Sử dụng công cụ dự báo thời tiết để biết hôm nay ở Bắc Kinh có mây, 10-14 độ C, gió Đông Bắc cấp 2, dễ bị cảm cúm"}]]
                                                    ),
-                     stream: bool = Body(False, description="流式输出"),
-                     model_name: str = Body(LLM_MODELS[0], description="LLM 模型名称。"),
-                     temperature: float = Body(TEMPERATURE, description="LLM 采样温度", ge=0.0, le=1.0),
-                     max_tokens: Optional[int] = Body(None, description="限制LLM生成Token数量，默认None代表模型最大值"),
+                     stream: bool = Body(False, description="Xuất dữ liệu theo dòng"),
+                     model_name: str = Body(LLM_MODELS[0], description="Tên mô hình LLM."),
+                     temperature: float = Body(TEMPERATURE, description="Nhiệt độ LLM", ge=0.0, le=1.0),
+                     max_tokens: Optional[int] = Body(None, description="Số lượng token LLM tối đa"),
                      prompt_name: str = Body("default",
-                                             description="使用的prompt模板名称(在configs/prompt_config.py中配置)"),
+                                             description="Tên mẫu prompt được sử dụng (được cấu hình trong configs/prompt_config.py)"),
                      ):
     history = [History.from_data(h) for h in history]
 
@@ -97,7 +98,7 @@ async def agent_chat(query: str = Body(..., description="用户输入", examples
             agent = LLMSingleActionAgent(
                 llm_chain=llm_chain,
                 output_parser=output_parser,
-                stop=["\nObservation:", "Observation"],
+                stop=["\nQuan sát:", "Quan sát"],
                 allowed_tools=tool_names,
             )
             agent_executor = AgentExecutor.from_agent_and_tools(agent=agent,
@@ -117,24 +118,24 @@ async def agent_chat(query: str = Body(..., description="用户输入", examples
         if stream:
             async for chunk in callback.aiter():
                 tools_use = []
-                # Use server-sent-events to stream the response
+                # Sử dụng server-sent-events để xuất dữ liệu theo dòng
                 data = json.loads(chunk)
                 if data["status"] == Status.start or data["status"] == Status.complete:
                     continue
                 elif data["status"] == Status.error:
                     tools_use.append("\n```\n")
-                    tools_use.append("工具名称: " + data["tool_name"])
-                    tools_use.append("工具状态: " + "调用失败")
-                    tools_use.append("错误信息: " + data["error"])
-                    tools_use.append("重新开始尝试")
+                    tools_use.append("Tên công cụ: " + data["tool_name"])
+                    tools_use.append("Tình trạng công cụ: " + "Gọi thất bại")
+                    tools_use.append("Lỗi: " + data["error"])
+                    tools_use.append("Thử lại")
                     tools_use.append("\n```\n")
                     yield json.dumps({"tools": tools_use}, ensure_ascii=False)
                 elif data["status"] == Status.tool_finish:
                     tools_use.append("\n```\n")
-                    tools_use.append("工具名称: " + data["tool_name"])
-                    tools_use.append("工具状态: " + "调用成功")
-                    tools_use.append("工具输入: " + data["input_str"])
-                    tools_use.append("工具输出: " + data["output_str"])
+                    tools_use.append("Tên công cụ: " + data["tool_name"])
+                    tools_use.append("Tình trạng công cụ: " + "Gọi thành công")
+                    tools_use.append("Nhập công cụ: " + data["input_str"])
+                    tools_use.append("Xuất công cụ: " + data["output_str"])
                     tools_use.append("\n```\n")
                     yield json.dumps({"tools": tools_use}, ensure_ascii=False)
                 elif data["status"] == Status.agent_finish:
@@ -152,16 +153,16 @@ async def agent_chat(query: str = Body(..., description="用户输入", examples
                     continue
                 if data["status"] == Status.error:
                     answer += "\n```\n"
-                    answer += "工具名称: " + data["tool_name"] + "\n"
-                    answer += "工具状态: " + "调用失败" + "\n"
-                    answer += "错误信息: " + data["error"] + "\n"
+                    answer += "Tên công cụ: " + data["tool_name"] + "\n"
+                    answer += "Tình trạng công cụ: " + "Gọi thất bại" + "\n"
+                    answer += "Lỗi: " + data["error"] + "\n"
                     answer += "\n```\n"
                 if data["status"] == Status.tool_finish:
                     answer += "\n```\n"
-                    answer += "工具名称: " + data["tool_name"] + "\n"
-                    answer += "工具状态: " + "调用成功" + "\n"
-                    answer += "工具输入: " + data["input_str"] + "\n"
-                    answer += "工具输出: " + data["output_str"] + "\n"
+                    answer += "Tên công cụ: " + data["tool_name"] + "\n"
+                    answer += "Tình trạng công cụ: " + "Gọi thành công" + "\n"
+                    answer += "Nhập công cụ: " + data["input_str"] + "\n"
+                    answer += "Xuất công cụ: " + data["output_str"] + "\n"
                     answer += "\n```\n"
                 if data["status"] == Status.agent_finish:
                     final_answer = data["final_answer"]

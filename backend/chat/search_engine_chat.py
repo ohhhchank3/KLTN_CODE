@@ -12,15 +12,16 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.utilities.bing_search import BingSearchAPIWrapper
 from langchain.utilities.duckduckgo_search import DuckDuckGoSearchAPIWrapper
 from markdownify import markdownify
-from backend.chat.utils import History
-from backend.utils import (BaseResponse, get_ChatOpenAI, get_prompt_template,
-                          wrap_done)
 from sse_starlette import EventSourceResponse
 from strsimpy.normalized_levenshtein import NormalizedLevenshtein
 
-from configs import (BING_SEARCH_URL, BING_SUBSCRIPTION_KEY, LLM_MODELS,
-                     METAPHOR_API_KEY, OVERLAP_SIZE, SEARCH_ENGINE_TOP_K,
-                     TEMPERATURE)
+from backend.chat.utils import History
+from backend.utils import (BaseResponse, get_ChatOpenAI, get_prompt_template,
+                           wrap_done)
+from configs.kb_config import (BING_SEARCH_URL, BING_SUBSCRIPTION_KEY,
+                               METAPHOR_API_KEY, OVERLAP_SIZE,
+                               SEARCH_ENGINE_TOP_K)
+from configs.model_config import LLM_MODELS, TEMPERATURE
 
 
 def bing_search(text, result_len=SEARCH_ENGINE_TOP_K, **kwargs):

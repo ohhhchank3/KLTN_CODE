@@ -16,8 +16,9 @@ from backend.knowledge_base.kb_service.base import EmbeddingsFunAdapter
 from backend.knowledge_base.utils import KnowledgeFile
 from backend.utils import (BaseResponse, get_ChatOpenAI, get_prompt_template,
                            get_temp_dir, run_in_thread_pool, wrap_done)
-from configs import (CHUNK_SIZE, LLM_MODELS, OVERLAP_SIZE, SCORE_THRESHOLD,
-                     TEMPERATURE, VECTOR_SEARCH_TOP_K, ZH_TITLE_ENHANCE)
+from configs.kb_config import (CHUNK_SIZE, OVERLAP_SIZE, SCORE_THRESHOLD,
+                               VECTOR_SEARCH_TOP_K, ZH_TITLE_ENHANCE)
+from configs.model_config import LLM_MODELS, TEMPERATURE
 
 
 def _parse_files_in_thread(

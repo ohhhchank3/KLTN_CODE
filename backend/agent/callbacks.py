@@ -1,11 +1,12 @@
 from __future__ import annotations
-from uuid import UUID
-from langchain.callbacks import AsyncIteratorCallbackHandler
-import json
-import asyncio
-from typing import Any, Dict, List, Optional
 
-from langchain.schema import AgentFinish, AgentAction
+import asyncio
+import json
+from typing import Any, Dict, List, Optional
+from uuid import UUID
+
+from langchain.callbacks import AsyncIteratorCallbackHandler
+from langchain.schema import AgentAction, AgentFinish
 from langchain.schema.output import LLMResult
 
 
@@ -35,7 +36,6 @@ class CustomAsyncIteratorCallbackHandler(AsyncIteratorCallbackHandler):
                             parent_run_id: UUID | None = None, tags: List[str] | None = None,
                             metadata: Dict[str, Any] | None = None, **kwargs: Any) -> None:
 
-        # 对于截断不能自理的大模型，我来帮他截断
         stop_words = ["Observation:", "Thought","\"","（", "\n","\t"]
         for stop_word in stop_words:
             index = input_str.find(stop_word)
@@ -53,12 +53,12 @@ class CustomAsyncIteratorCallbackHandler(AsyncIteratorCallbackHandler):
             "final_answer": "",
             "error": "",
         }
-        # print("\nInput Str:",self.cur_tool["input_str"])
+
         self.queue.put_nowait(dumps(self.cur_tool))
 
     async def on_tool_end(self, output: str, *, run_id: UUID, parent_run_id: UUID | None = None,
                           tags: List[str] | None = None, **kwargs: Any) -> None:
-        self.out = True ## 重置输出
+        self.out = True
         self.cur_tool.update(
             status=Status.tool_finish,
             output_str=output.replace("Answer:", ""),
@@ -73,23 +73,6 @@ class CustomAsyncIteratorCallbackHandler(AsyncIteratorCallbackHandler):
         )
         self.queue.put_nowait(dumps(self.cur_tool))
 
-    # async def on_llm_new_token(self, token: str, **kwargs: Any) -> None:
-    #     if "Action" in token: ## 减少重复输出
-    #         before_action = token.split("Action")[0]
-    #         self.cur_tool.update(
-    #             status=Status.running,
-    #             llm_token=before_action + "\n",
-    #         )
-    #         self.queue.put_nowait(dumps(self.cur_tool))
-    #
-    #         self.out = False
-    #
-    #     if token and self.out:
-    #         self.cur_tool.update(
-    #                 status=Status.running,
-    #                 llm_token=token,
-    #         )
-    #         self.queue.put_nowait(dumps(self.cur_tool))
     async def on_llm_new_token(self, token: str, **kwargs: Any) -> None:
         special_tokens = ["Action", "<|observation|>"]
         for stoken in special_tokens:
@@ -152,7 +135,7 @@ class CustomAsyncIteratorCallbackHandler(AsyncIteratorCallbackHandler):
             tags: Optional[List[str]] = None,
             **kwargs: Any,
     ) -> None:
-        # 返回最终答案
+
         self.cur_tool.update(
             status=Status.agent_finish,
             final_answer=finish.return_values["output"],
