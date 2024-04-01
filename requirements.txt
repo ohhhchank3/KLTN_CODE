@@ -1,0 +1,12 @@
+langchain 
+unstructured
+unstructured-inference
+docx
+python-docx
+rapidocr-onnxruntime
+pymupdf
+fitz
+opencv-python
+pytesseract
+paddleocr
+langchain_community==0.0.19
