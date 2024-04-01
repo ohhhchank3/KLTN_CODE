@@ -16,9 +16,10 @@ from backend.knowledge_base.kb_service.base import KBServiceFactory
 from backend.reranker.reranker import LangchainReranker
 from backend.utils import (BaseResponse, embedding_device, get_ChatOpenAI,
                            get_prompt_template, wrap_done)
-from configs import (LLM_MODELS, MODEL_PATH, RERANKER_MAX_LENGTH,
-                     RERANKER_MODEL, SCORE_THRESHOLD, TEMPERATURE,
-                     USE_RERANKER, VECTOR_SEARCH_TOP_K)
+from configs.kb_config import (CHUNK_SIZE, OVERLAP_SIZE, SCORE_THRESHOLD,
+                               VECTOR_SEARCH_TOP_K, ZH_TITLE_ENHANCE)
+from configs.model_config import (LLM_MODELS, MODEL_PATH, RERANKER_MAX_LENGTH,
+                                  RERANKER_MODEL, TEMPERATURE, USE_RERANKER)
 
 
 async def knowledge_base_chat(query: str = Body(..., description="Đầu vào từ người dùng", examples=["Xin chào"]),

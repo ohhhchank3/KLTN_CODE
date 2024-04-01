@@ -1,34 +1,34 @@
 from __future__ import annotations
-import re
-import warnings
-from typing import Dict
 
-from langchain.callbacks.manager import (
-    AsyncCallbackManagerForChainRun,
-    CallbackManagerForChainRun,
-)
+import json
+import os
+import re
+import sys
+import warnings
+from typing import Any, Dict, List, Optional
+
+from langchain.callbacks.manager import (AsyncCallbackManagerForChainRun,
+                                         CallbackManagerForChainRun)
 from langchain.chains.llm import LLMChain
+from langchain.prompts import PromptTemplate
 from langchain.pydantic_v1 import Extra, root_validator
 from langchain.schema import BasePromptTemplate
 from langchain.schema.language_model import BaseLanguageModel
-from typing import List, Any, Optional
-from langchain.prompts import PromptTemplate
-import sys
-import os
-import json
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
-from server.chat.knowledge_base_chat import knowledge_base_chat
-from configs import VECTOR_SEARCH_TOP_K, SCORE_THRESHOLD, MAX_TOKENS
-
 import asyncio
-from server.agent import model_container
+
 from pydantic import BaseModel, Field
+
+from backend.agent import model_contain
+from backend.chat.knowledge_base_chat import knowledge_base_chat
+from configs import MAX_TOKENS, SCORE_THRESHOLD, VECTOR_SEARCH_TOP_K
+
 
 async def search_knowledge_base_iter(database: str, query: str):
     response = await knowledge_base_chat(query=query,
                                          knowledge_base_name=database,
-                                         model_name=model_container.MODEL.model_name,
+                                         model_name=model_contain.MODEL.model_name,
                                          temperature=0.01,
                                          history=[],
                                          top_k=VECTOR_SEARCH_TOP_K,
@@ -38,7 +38,7 @@ async def search_knowledge_base_iter(database: str, query: str):
                                          stream=False)
 
     contents = ""
-    async for data in response.body_iterator:  # 这里的data是一个json字符串
+    async for data in response.body_iterator:  # Đây là chuỗi JSON
         data = json.loads(data)
         contents += data["answer"]
         docs = data["docs"]
@@ -46,24 +46,31 @@ async def search_knowledge_base_iter(database: str, query: str):
 
 
 _PROMPT_TEMPLATE = """
-用户会提出一个需要你查询知识库的问题，你应该按照我提供的思想进行思考
-Question: ${{用户的问题}}
-这些数据库是你能访问的，冒号之前是他们的名字，冒号之后是他们的功能：
+Người dùng sẽ đặt một câu hỏi mà bạn cần tìm trong cơ sở kiến thức, bạn cần hiểu và phân tích câu hỏi và tìm kiếm nội dung liên quan trong cơ sở kiến thức.
+
+Đối với mỗi cơ sở kiến thức, nội dung bạn xuất ra phải là một chuỗi trên một dòng, chứa tên cơ sở kiến thức và nội dung tìm kiếm, cách nhau bởi dấu phẩy, không có chữ cái và ký tự đặc biệt không cần thiết khác, ví dụ như không có dấu phẩy tiếng Việt.
+
+Ví dụ:
+
+robotic, tỷ lệ nam nữ trong robot là bao nhiêu
+bigdata, tình hình việc làm trong lĩnh vực dữ liệu lớn như thế nào
+
+Dưới đây là các cơ sở kiến thức bạn có thể truy cập, phần sau dấu hai chấm là chức năng của chúng, bạn nên tham khảo chúng để giúp quá trình suy nghĩ của bạn
 
 {database_names}
 
-你的回答格式应该按照下面的内容，请注意，格式内的```text 等标记都必须输出，这是我用来提取答案的标记。
+Định dạng câu trả lời của bạn nên tuân thủ theo nội dung dưới đây, hãy chú ý rằng các đánh dấu như ```text cần được bao gồm, đây là cách để trích xuất câu trả lời.
+Không in ra dấu phẩy tiếng Việt, không in ra dấu ngoặc kép.
+
+Question: ${{câu hỏi của người dùng}}
+
 ```text
-${{知识库的名称}}
-```
+${{tên cơ sở kiến thức, câu hỏi tìm kiếm, không có ký tự đặc biệt ngoài dấu phẩy, không in dấu phẩy tiếng Việt, không in dấu ngoặc kép}}
 ```output
-数据库查询的结果
-```
-答案: ${{答案}}
+Kết quả tìm kiếm từ cơ sở dữ liệu
 
-现在，这是我的问题：
-问题: {question}
-
+Bắt đầu tìm kiếm
+Câu hỏi: {question}
 """
 PROMPT = PromptTemplate(
     input_variables=["question", "database_names"],
@@ -74,16 +81,12 @@ PROMPT = PromptTemplate(
 class LLMKnowledgeChain(LLMChain):
     llm_chain: LLMChain
     llm: Optional[BaseLanguageModel] = None
-    """[Deprecated] LLM wrapper to use."""
     prompt: BasePromptTemplate = PROMPT
-    """[Deprecated] Prompt to use to translate to python if necessary."""
-    database_names: Dict[str, str] = model_container.DATABASE
-    input_key: str = "question"  #: :meta private:
-    output_key: str = "answer"  #: :meta private:
+    database_names: Dict[str, str] = model_contain.DATABASE
+    input_key: str = "question"
+    output_key: str = "answer"
 
     class Config:
-        """Configuration for this pydantic object."""
-
         extra = Extra.forbid
         arbitrary_types_allowed = True
 
@@ -91,9 +94,8 @@ class LLMKnowledgeChain(LLMChain):
     def raise_deprecation(cls, values: Dict) -> Dict:
         if "llm" in values:
             warnings.warn(
-                "Directly instantiating an LLMKnowledgeChain with an llm is deprecated. "
-                "Please instantiate with llm_chain argument or using the from_llm "
-                "class method."
+                "Khởi tạo trực tiếp một LLMKnowledgeChain với một llm đã bị loại bỏ. "
+                "Vui lòng khởi tạo với đối số llm_chain hoặc sử dụng phương thức from_llm."
             )
             if "llm_chain" not in values and values["llm"] is not None:
                 prompt = values.get("prompt", PROMPT)
@@ -102,25 +104,17 @@ class LLMKnowledgeChain(LLMChain):
 
     @property
     def input_keys(self) -> List[str]:
-        """Expect input key.
-
-        :meta private:
-        """
         return [self.input_key]
 
     @property
     def output_keys(self) -> List[str]:
-        """Expect output key.
-
-        :meta private:
-        """
         return [self.output_key]
 
     def _evaluate_expression(self, dataset, query) -> str:
         try:
             output = asyncio.run(search_knowledge_base_iter(dataset, query))
         except Exception as e:
-            output = "输入的信息有误或不存在知识库"
+            output = "Thông tin nhập không đúng hoặc không tìm thấy cơ sở kiến thức"
             return output
         return output
 
@@ -146,7 +140,7 @@ class LLMKnowledgeChain(LLMChain):
         elif "Answer:" in llm_output:
             answer = "Answer: " + llm_output.split("Answer:")[-1]
         else:
-            return {self.output_key: f"输入的格式不对: {llm_output}"}
+            return {self.output_key: f"Định dạng nhập không đúng: {llm_output}"}
         return {self.output_key: answer}
 
     async def _aprocess_llm_result(
@@ -168,7 +162,7 @@ class LLMKnowledgeChain(LLMChain):
         elif "Answer:" in llm_output:
             answer = "Answer: " + llm_output.split("Answer:")[-1]
         else:
-            raise ValueError(f"unknown format from LLM: {llm_output}")
+            raise ValueError(f"Định dạng không xác định từ LLM: {llm_output}")
         return {self.output_key: answer}
 
     def _call(
@@ -219,16 +213,16 @@ class LLMKnowledgeChain(LLMChain):
 
 
 def search_knowledgebase_once(query: str):
-    model = model_container.MODEL
+    model = model_contain.MODEL
     llm_knowledge = LLMKnowledgeChain.from_llm(model, verbose=True, prompt=PROMPT)
     ans = llm_knowledge.run(query)
     return ans
 
 
 class KnowledgeSearchInput(BaseModel):
-    location: str = Field(description="The query to be searched")
+    location: str = Field(description="Câu hỏi cần tìm kiếm")
 
 
 if __name__ == "__main__":
-    result = search_knowledgebase_once("大数据的男女比例")
+    result = search_knowledgebase_once("Tỉ lệ nam nữ trong lĩnh vực dữ liệu lớn")
     print(result)

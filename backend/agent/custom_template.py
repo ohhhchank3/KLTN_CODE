@@ -1,11 +1,15 @@
 from __future__ import annotations
-from langchain.agents import Tool, AgentOutputParser
-from langchain.prompts import StringPromptTemplate
+
 from typing import List
+
+from langchain.agents import AgentOutputParser, Tool
+from langchain.prompts import StringPromptTemplate
 from langchain.schema import AgentAction, AgentFinish
 
+from backend.agent import model_container
 from configs import SUPPORT_AGENT_MODEL
-from server.agent import model_container
+
+
 class CustomPromptTemplate(StringPromptTemplate):
     template: str
     tools: List[Tool]
@@ -47,7 +51,7 @@ class CustomOutputParser(AgentOutputParser):
         parts = llm_output.split("Action:")
         if len(parts) < 2:
             return AgentFinish(
-                return_values={"output": f"调用agent工具失败，该回答为大模型自身能力的回答:\n\n `{llm_output}`"},
+                return_values={"output": f"Gọi công cụ agent thất bại, câu trả lời này là khả năng tự hoàn thiện của mô hình lớn:\n\n `{llm_output}`"},
                 log=llm_output,
             )
 
@@ -62,6 +66,6 @@ class CustomOutputParser(AgentOutputParser):
             return ans
         except:
             return AgentFinish(
-                return_values={"output": f"调用agent失败: `{llm_output}`"},
+                return_values={"output": f"Gọi agent thất bại: `{llm_output}`"},
                 log=llm_output,
             )
