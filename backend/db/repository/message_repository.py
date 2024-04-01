@@ -1,14 +1,15 @@
-from server.db.session import with_session
-from typing import Dict, List
 import uuid
-from server.db.models.message_model import MessageModel
+from typing import Dict, List
+
+from backend.db.models.message_model import MessageModel
+from backend.db.session import with_session
 
 
 @with_session
 def add_message_to_db(session, conversation_id: str, chat_type, query, response="", message_id=None,
                       metadata: Dict = {}):
     """
-    新增聊天记录
+    Thêm bản ghi trò chuyện mới
     """
     if not message_id:
         message_id = uuid.uuid4().hex
@@ -23,7 +24,7 @@ def add_message_to_db(session, conversation_id: str, chat_type, query, response=
 @with_session
 def update_message(session, message_id, response: str = None, metadata: Dict = None):
     """
-    更新已有的聊天记录
+    Cập nhật bản ghi trò chuyện đã có
     """
     m = get_message_by_id(message_id)
     if m is not None:
@@ -39,7 +40,7 @@ def update_message(session, message_id, response: str = None, metadata: Dict = N
 @with_session
 def get_message_by_id(session, message_id) -> MessageModel:
     """
-    查询聊天记录
+    Truy vấn bản ghi trò chuyện
     """
     m = session.query(MessageModel).filter_by(id=message_id).first()
     return m
@@ -48,7 +49,7 @@ def get_message_by_id(session, message_id) -> MessageModel:
 @with_session
 def feedback_message_to_db(session, message_id, feedback_score, feedback_reason):
     """
-    反馈聊天记录
+    Phản hồi vào bản ghi trò chuyện
     """
     m = session.query(MessageModel).filter_by(id=message_id).first()
     if m:
@@ -61,11 +62,11 @@ def feedback_message_to_db(session, message_id, feedback_score, feedback_reason)
 @with_session
 def filter_message(session, conversation_id: str, limit: int = 10):
     messages = (session.query(MessageModel).filter_by(conversation_id=conversation_id).
-                # 用户最新的query 也会插入到db，忽略这个message record
+                # Bản ghi trả lời của người dùng mới nhất cũng sẽ được chèn vào db, bỏ qua bản ghi này
                 filter(MessageModel.response != '').
-                # 返回最近的limit 条记录
+                # Trả về các bản ghi gần đây nhất trong giới hạn limit
                 order_by(MessageModel.create_time.desc()).limit(limit).all())
-    # 直接返回 List[MessageModel] 报错
+    # Trực tiếp trả về List[MessageModel] sẽ gây lỗi
     data = []
     for m in messages:
         data.append({"query": m.query, "response": m.response})

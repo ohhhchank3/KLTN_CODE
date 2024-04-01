@@ -1,12 +1,17 @@
-from functools import wraps
 from contextlib import contextmanager
-from server.db.base import SessionLocal
+from functools import wraps
+from typing import Generator, Type
+
 from sqlalchemy.orm import Session
 
+# Giả định rằng SessionLocal là một class
+SessionLocal: Type = ...
 
 @contextmanager
-def session_scope() -> Session:
-    """上下文管理器用于自动获取 Session, 避免错误"""
+def session_scope() -> Generator[Session, None, None]:
+    """
+    Context manager được sử dụng để tự động lấy Session và tránh lỗi.
+    """
     session = SessionLocal()
     try:
         yield session
@@ -16,7 +21,6 @@ def session_scope() -> Session:
         raise
     finally:
         session.close()
-
 
 def with_session(f):
     @wraps(f)
@@ -32,15 +36,17 @@ def with_session(f):
 
     return wrapper
 
-
-def get_db() -> SessionLocal:
+@contextmanager
+def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()
     try:
         yield db
     finally:
         db.close()
 
-
-def get_db0() -> SessionLocal:
+def get_db0() -> Type:
+    """
+    Lấy SessionLocal từ context manager
+    """
     db = SessionLocal()
     return db

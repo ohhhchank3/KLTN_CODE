@@ -1,11 +1,14 @@
+import json
 import sys
-from fastchat.conversation import Conversation
-from server.model_workers.base import *
-from server.utils import get_httpx_client
+from typing import Dict, List
+
+import httpx
 from fastchat import conversation as conv
-import json, httpx
-from typing import List, Dict
-from configs import logger, log_verbose
+from fastchat.conversation import Conversation
+
+from backend.model_workers.base import *
+from backend.utils import get_httpx_client
+from configs.basic_config import log_verbose, logger
 
 
 class GeminiWorker(ApiModelWorker):
@@ -111,13 +114,14 @@ class GeminiWorker(ApiModelWorker):
 
 if __name__ == "__main__":
     import uvicorn
-    from server.utils import MakeFastAPIOffline
     from fastchat.serve.base_model_worker import app
+
+    from backend.utils import MakeFastAPIOffline
 
     worker = GeminiWorker(
         controller_addr="http://127.0.0.1:20001",
-        worker_addr="http://127.0.0.1:21012",
+        worker_addr="http://127.0.0.1:21002",
     )
     sys.modules["fastchat.serve.model_worker"].worker = worker
     MakeFastAPIOffline(app)
-    uvicorn.run(app, port=21012)
+    uvicorn.run(app, port=21002)
