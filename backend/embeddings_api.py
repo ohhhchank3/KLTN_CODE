@@ -1,10 +1,14 @@
-from langchain.docstore.document import Document
-from configs import EMBEDDING_MODEL, logger
-from server.model_workers.base import ApiEmbeddingsParams
-from server.utils import BaseResponse, get_model_worker_config, list_embed_models, list_online_embed_models
+from typing import Dict, List
+
 from fastapi import Body
 from fastapi.concurrency import run_in_threadpool
-from typing import Dict, List
+from langchain.docstore.document import Document
+
+from backend.model_workers.base import ApiEmbeddingsParams
+from backend.utils import (BaseResponse, get_model_worker_config,
+                           list_embed_models, list_online_embed_models)
+from configs.basic_config import log_verbose, logger
+from configs.model_config import EMBEDDING_MODEL
 
 online_embed_models = list_online_embed_models()
 
@@ -15,16 +19,16 @@ def embed_texts(
         to_query: bool = False,
 ) -> BaseResponse:
     '''
-    对文本进行向量化。返回数据格式：BaseResponse(data=List[List[float]])
+    Đối với các văn bản, thực hiện vector hóa. Định dạng dữ liệu trả về: BaseResponse(data=List[List[float]])
     '''
     try:
-        if embed_model in list_embed_models():  # 使用本地Embeddings模型
-            from server.utils import load_local_embeddings
+        if embed_model in list_embed_models():  # Sử dụng mô hình Embeddings địa phương
+            from backend.utils import load_local_embeddings
 
             embeddings = load_local_embeddings(model=embed_model)
             return BaseResponse(data=embeddings.embed_documents(texts))
 
-        if embed_model in list_online_embed_models():  # 使用在线API
+        if embed_model in list_online_embed_models():  # Sử dụng API trực tuyến
             config = get_model_worker_config(embed_model)
             worker_class = config.get("worker_class")
             embed_model = config.get("embed_model")
@@ -34,10 +38,10 @@ def embed_texts(
                 resp = worker.do_embeddings(params)
                 return BaseResponse(**resp)
 
-        return BaseResponse(code=500, msg=f"指定的模型 {embed_model} 不支持 Embeddings 功能。")
+        return BaseResponse(code=500, msg=f"Mô hình được chỉ định {embed_model} không hỗ trợ chức năng Embeddings.")
     except Exception as e:
         logger.error(e)
-        return BaseResponse(code=500, msg=f"文本向量化过程中出现错误：{e}")
+        return BaseResponse(code=500, msg=f"Có lỗi xảy ra trong quá trình vector hóa văn bản: {e}")
 
 
 async def aembed_texts(
@@ -46,33 +50,33 @@ async def aembed_texts(
     to_query: bool = False,
 ) -> BaseResponse:
     '''
-    对文本进行向量化。返回数据格式：BaseResponse(data=List[List[float]])
+    Đối với các văn bản, thực hiện vector hóa. Định dạng dữ liệu trả về: BaseResponse(data=List[List[float]])
     '''
     try:
-        if embed_model in list_embed_models(): # 使用本地Embeddings模型
-            from server.utils import load_local_embeddings
+        if embed_model in list_embed_models(): # Sử dụng mô hình Embeddings địa phương
+            from backend.utils import load_local_embeddings
 
             embeddings = load_local_embeddings(model=embed_model)
             return BaseResponse(data=await embeddings.aembed_documents(texts))
 
-        if embed_model in list_online_embed_models(): # 使用在线API
+        if embed_model in list_online_embed_models(): # Sử dụng API trực tuyến
             return await run_in_threadpool(embed_texts,
                                            texts=texts,
                                            embed_model=embed_model,
                                            to_query=to_query)
     except Exception as e:
         logger.error(e)
-        return BaseResponse(code=500, msg=f"文本向量化过程中出现错误：{e}")
+        return BaseResponse(code=500, msg=f"Có lỗi xảy ra trong quá trình vector hóa văn bản: {e}")
 
 
 def embed_texts_endpoint(
-        texts: List[str] = Body(..., description="要嵌入的文本列表", examples=[["hello", "world"]]),
+        texts: List[str] = Body(..., description="Danh sách văn bản để nhúng", examples=[["xin chào", "thế giới"]]),
         embed_model: str = Body(EMBEDDING_MODEL,
-                                description=f"使用的嵌入模型，除了本地部署的Embedding模型，也支持在线API({online_embed_models})提供的嵌入服务。"),
-        to_query: bool = Body(False, description="向量是否用于查询。有些模型如Minimax对存储/查询的向量进行了区分优化。"),
+                                description=f"Mô hình nhúng được sử dụng, ngoài các mô hình nhúng địa phương, cũng hỗ trợ dịch vụ nhúng từ xa ({online_embed_models}) được cung cấp qua API."),
+        to_query: bool = Body(False, description="Có sử dụng vectơ để tìm kiếm không. Một số mô hình như Minimax đã tối ưu hóa việc phân biệt vectơ để lưu trữ/tìm kiếm."),
 ) -> BaseResponse:
     '''
-    对文本进行向量化，返回 BaseResponse(data=List[List[float]])
+    Đối với các văn bản, thực hiện vector hóa và trả về BaseResponse(data=List[List[float]])
     '''
     return embed_texts(texts=texts, embed_model=embed_model, to_query=to_query)
 
@@ -83,7 +87,7 @@ def embed_documents(
         to_query: bool = False,
 ) -> Dict:
     """
-    将 List[Document] 向量化，转化为 VectorStore.add_embeddings 可以接受的参数
+    Vector hóa List[Document], chuyển đổi thành các tham số có thể được chấp nhận bởi VectorStore.add_embeddings
     """
     texts = [x.page_content for x in docs]
     metadatas = [x.metadata for x in docs]

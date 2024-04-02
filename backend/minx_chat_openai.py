@@ -1,10 +1,6 @@
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Tuple
-)
-import sys
 import logging
+import sys
+from typing import TYPE_CHECKING, Any, Tuple
 
 logger = logging.getLogger(__name__)
 

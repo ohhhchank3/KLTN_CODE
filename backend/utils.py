@@ -1,33 +1,25 @@
-import pydantic
-from pydantic import BaseModel
-from typing import List
-from fastapi import FastAPI
-from pathlib import Path
 import asyncio
-from configs import (LLM_MODELS, LLM_DEVICE, EMBEDDING_DEVICE,
-                     MODEL_PATH, MODEL_ROOT_PATH, ONLINE_LLM_MODEL, logger, log_verbose,
-                     FSCHAT_MODEL_WORKERS, HTTPX_DEFAULT_TIMEOUT)
+import logging
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pathlib import Path
+from typing import (TYPE_CHECKING, Any, Awaitable, Callable, Dict, Generator,
+                    List, Literal, Optional, Tuple, Union)
+
+import httpx
+import pydantic
+import torch
+from fastapi import FastAPI
 from langchain.chat_models import ChatOpenAI
 from langchain.llms import OpenAI
-import httpx
-from typing import (
-    TYPE_CHECKING,
-    Literal,
-    Optional,
-    Callable,
-    Generator,
-    Dict,
-    Any,
-    Awaitable,
-    Union,
-    Tuple
-)
-import logging
-import torch
+from pydantic import BaseModel
 
-from server.minx_chat_openai import MinxChatOpenAI
+from backend.minx_chat_openai import MinxChatOpenAI
+from configs.basic_config import log_verbose, logger
+from configs.model_config import (EMBEDDING_DEVICE, LLM_DEVICE, LLM_MODELS,
+                                  MODEL_PATH, MODEL_ROOT_PATH,
+                                  ONLINE_LLM_MODEL)
+from configs.server_config import FSCHAT_MODEL_WORKERS, HTTPX_DEFAULT_TIMEOUT
 
 
 async def wrap_done(fn: Awaitable, event: asyncio.Event):
@@ -139,28 +131,28 @@ class ChatMessage(BaseModel):
     class Config:
         schema_extra = {
             "example": {
-                "question": "工伤保险如何办理？",
-                "response": "根据已知信息，可以总结如下：\n\n1. 参保单位为员工缴纳工伤保险费，以保障员工在发生工伤时能够获得相应的待遇。\n"
-                            "2. 不同地区的工伤保险缴费规定可能有所不同，需要向当地社保部门咨询以了解具体的缴费标准和规定。\n"
-                            "3. 工伤从业人员及其近亲属需要申请工伤认定，确认享受的待遇资格，并按时缴纳工伤保险费。\n"
-                            "4. 工伤保险待遇包括工伤医疗、康复、辅助器具配置费用、伤残待遇、工亡待遇、一次性工亡补助金等。\n"
-                            "5. 工伤保险待遇领取资格认证包括长期待遇领取人员认证和一次性待遇领取人员认证。\n"
-                            "6. 工伤保险基金支付的待遇项目包括工伤医疗待遇、康复待遇、辅助器具配置费用、一次性工亡补助金、丧葬补助金等。",
+                "question": "How to handle work injury insurance?",
+                "response": "Based on the available information, we can summarize as follows:\n\n1. The insured unit pays work injury insurance premiums for employees to ensure that employees can receive corresponding benefits in the event of a work injury.\n"
+                            "2. The payment regulations for work injury insurance may vary in different regions, so it is necessary to consult the local social security department to understand the specific payment standards and regulations.\n"
+                            "3. Workers with work-related injuries and their immediate family members need to apply for work injury identification, confirm their eligibility for benefits, and pay work injury insurance premiums on time.\n"
+                            "4. Work injury insurance benefits include medical treatment for work injuries, rehabilitation, auxiliary equipment costs, disability benefits, death benefits, one-time death benefits, and more.\n"
+                            "5. Qualification certification for receiving work injury insurance benefits includes certification for long-term benefit recipients and one-time benefit recipients.\n"
+                            "6. Work injury insurance fund payments cover benefits such as medical treatment for work injuries, rehabilitation, auxiliary equipment costs, one-time death benefits, and funeral allowances, among others.",
                 "history": [
                     [
-                        "工伤保险是什么？",
-                        "工伤保险是指用人单位按照国家规定，为本单位的职工和用人单位的其他人员，缴纳工伤保险费，"
-                        "由保险机构按照国家规定的标准，给予工伤保险待遇的社会保险制度。",
+                        "What is work injury insurance?",
+                        "Work injury insurance refers to a social insurance system in which employers pay work injury insurance premiums for employees and other personnel of the employing unit according to national regulations, and insurance institutions provide work injury insurance benefits according to national standards.",
                     ]
                 ],
                 "source_documents": [
-                    "出处 [1] 广州市单位从业的特定人员参加工伤保险办事指引.docx：\n\n\t"
-                    "( 一)  从业单位  (组织)  按“自愿参保”原则，  为未建 立劳动关系的特定从业人员单项参加工伤保险 、缴纳工伤保 险费。",
-                    "出处 [2] ...",
-                    "出处 [3] ...",
+                    "Source [1] Guangzhou unit employees participating in work injury insurance guidance.docx:\n\n\t"
+                    "(1) Employers (organizations) follow the principle of 'voluntary participation' to allow specific employees without established labor relations to participate in work injury insurance and pay work injury insurance premiums.",
+                    "Source [2] ...",
+                    "Source [3] ...",
                 ],
             }
         }
+
 
 
 def torch_gc():
@@ -175,8 +167,7 @@ def torch_gc():
                 from torch.mps import empty_cache
                 empty_cache()
             except Exception as e:
-                msg = ("如果您使用的是 macOS 建议将 pytorch 版本升级至 2.0.0 或更高版本，"
-                       "以支持及时清理 torch 产生的内存占用。")
+                msg = ("Nếu bạn đang sử dụng macOS, bạn nên nâng cấp phiên bản PyTorch lên phiên bản 2.0.0 hoặc cao hơn để hỗ trợ việc dọn dẹp bộ nhớ nhanh chóng do PyTorch tạo ra.")
                 logger.error(f'{e.__class__.__name__}: {msg}',
                              exc_info=e if log_verbose else None)
     except Exception:
@@ -185,7 +176,7 @@ def torch_gc():
 
 def run_async(cor):
     '''
-    在同步环境中运行异步代码.
+
     '''
     try:
         loop = asyncio.get_event_loop()
@@ -196,7 +187,7 @@ def run_async(cor):
 
 def iter_over_async(ait, loop=None):
     '''
-    将异步生成器封装成同步生成器.
+
     '''
     ait = ait.__aiter__()
 
@@ -229,11 +220,8 @@ def MakeFastAPIOffline(
 ) -> None:
     """patch the FastAPI obj that doesn't rely on CDN for the documentation page"""
     from fastapi import Request
-    from fastapi.openapi.docs import (
-        get_redoc_html,
-        get_swagger_ui_html,
-        get_swagger_ui_oauth2_redirect_html,
-    )
+    from fastapi.openapi.docs import (get_redoc_html, get_swagger_ui_html,
+                                      get_swagger_ui_oauth2_redirect_html)
     from fastapi.staticfiles import StaticFiles
     from starlette.responses import HTMLResponse
 
@@ -330,35 +318,34 @@ def get_model_path(model_name: str, type: str = None) -> Optional[str]:
         for v in MODEL_PATH.values():
             paths.update(v)
 
-    if path_str := paths.get(model_name):  # 以 "chatglm-6b": "THUDM/chatglm-6b-new" 为例，以下都是支持的路径
+    if path_str := paths.get(model_name):  
         path = Path(path_str)
-        if path.is_dir():  # 任意绝对路径
+        if path.is_dir():
             return str(path)
 
         root_path = Path(MODEL_ROOT_PATH)
         if root_path.is_dir():
             path = root_path / model_name
-            if path.is_dir():  # use key, {MODEL_ROOT_PATH}/chatglm-6b
+            if path.is_dir(): 
                 return str(path)
             path = root_path / path_str
-            if path.is_dir():  # use value, {MODEL_ROOT_PATH}/THUDM/chatglm-6b-new
+            if path.is_dir():  # 
                 return str(path)
             path = root_path / path_str.split("/")[-1]
-            if path.is_dir():  # use value split by "/", {MODEL_ROOT_PATH}/chatglm-6b-new
+            if path.is_dir():  
                 return str(path)
         return path_str  # THUDM/chatglm06b
 
 
-# 从server_config中获取服务信息
+
 
 def get_model_worker_config(model_name: str = None) -> dict:
     '''
-    加载model worker的配置项。
-    优先级:FSCHAT_MODEL_WORKERS[model_name] > ONLINE_LLM_MODEL[model_name] > FSCHAT_MODEL_WORKERS["default"]
+
     '''
-    from configs.model_config import ONLINE_LLM_MODEL, MODEL_PATH
+    from backend import model_workers
+    from configs.model_config import MODEL_PATH, ONLINE_LLM_MODEL
     from configs.server_config import FSCHAT_MODEL_WORKERS
-    from server import model_workers
 
     config = FSCHAT_MODEL_WORKERS.get("default", {}).copy()
     config.update(ONLINE_LLM_MODEL.get(model_name, {}).copy())
@@ -370,7 +357,7 @@ def get_model_worker_config(model_name: str = None) -> dict:
             try:
                 config["worker_class"] = getattr(model_workers, provider)
             except Exception as e:
-                msg = f"在线模型 ‘{model_name}’ 的provider没有正确配置"
+                msg = f"‘{model_name}’ chưa được cấu hình đúng"
                 logger.error(f'{e.__class__.__name__}: {msg}',
                              exc_info=e if log_verbose else None)
     # 本地模型
@@ -442,12 +429,12 @@ def webui_address() -> str:
 
 def get_prompt_template(type: str, name: str) -> Optional[str]:
     '''
-    从prompt_config中加载模板内容
-    type: "llm_chat","agent_chat","knowledge_base_chat","search_engine_chat"的其中一种，如果有新功能，应该进行加入。
+
     '''
 
-    from configs import prompt_config
     import importlib
+
+    from configs import prompt_config
     importlib.reload(prompt_config)
     return prompt_config.PROMPT_TEMPLATES[type].get(name)
 
@@ -457,13 +444,12 @@ def set_httpx_config(
         proxy: Union[str, Dict] = None,
 ):
     '''
-    设置httpx默认timeout。httpx默认timeout是5秒，在请求LLM回答时不够用。
-    将本项目相关服务加入无代理列表，避免fastchat的服务器请求错误。(windows下无效)
-    对于chatgpt等在线API，如要使用代理需要手动配置。搜索引擎的代理如何处置还需考虑。
+
     '''
 
-    import httpx
     import os
+
+    import httpx
 
     httpx._config.DEFAULT_TIMEOUT_CONFIG.connect = timeout
     httpx._config.DEFAULT_TIMEOUT_CONFIG.read = timeout
@@ -540,8 +526,7 @@ def run_in_thread_pool(
         params: List[Dict] = [],
 ) -> Generator:
     '''
-    在线程池中批量运行任务，并将运行结果以生成器的形式返回。
-    请确保任务中的所有操作是线程安全的，任务函数请全部使用关键字参数。
+
     '''
     tasks = []
     with ThreadPoolExecutor() as pool:
@@ -615,26 +600,15 @@ def get_httpx_client(
 
 def get_server_configs() -> Dict:
     '''
-    获取configs中的原始配置项，供前端使用
+   config
     '''
-    from configs.kb_config import (
-        DEFAULT_KNOWLEDGE_BASE,
-        DEFAULT_SEARCH_ENGINE,
-        DEFAULT_VS_TYPE,
-        CHUNK_SIZE,
-        OVERLAP_SIZE,
-        SCORE_THRESHOLD,
-        VECTOR_SEARCH_TOP_K,
-        SEARCH_ENGINE_TOP_K,
-        ZH_TITLE_ENHANCE,
-        text_splitter_dict,
-        TEXT_SPLITTER_NAME,
-    )
-    from configs.model_config import (
-        LLM_MODELS,
-        HISTORY_LEN,
-        TEMPERATURE,
-    )
+    from configs.kb_config import (CHUNK_SIZE, DEFAULT_KNOWLEDGE_BASE,
+                                   DEFAULT_SEARCH_ENGINE, DEFAULT_VS_TYPE,
+                                   OVERLAP_SIZE, SCORE_THRESHOLD,
+                                   SEARCH_ENGINE_TOP_K, TEXT_SPLITTER_NAME,
+                                   VECTOR_SEARCH_TOP_K, ZH_TITLE_ENHANCE,
+                                   text_splitter_dict)
+    from configs.model_config import HISTORY_LEN, LLM_MODELS, TEMPERATURE
     from configs.prompt_config import PROMPT_TEMPLATES
 
     _custom = {
@@ -647,7 +621,7 @@ def get_server_configs() -> Dict:
 
 
 def list_online_embed_models() -> List[str]:
-    from server import model_workers
+    from backend import model_workers
 
     ret = []
     for k, v in list_config_llm_models()["online"].items():
@@ -660,10 +634,10 @@ def list_online_embed_models() -> List[str]:
 
 def load_local_embeddings(model: str = None, device: str = embedding_device()):
     '''
-    从缓存中加载embeddings，可以避免多线程时竞争加载。
+     embedding
     '''
-    from server.knowledge_base.kb_cache.base import embeddings_pool
-    from configs import EMBEDDING_MODEL
+    from backend.knowledge_base.kb_cache.base import embeddings_pool
+    from configs.model_config import EMBEDDING_MODEL
 
     model = model or EMBEDDING_MODEL
     return embeddings_pool.load_embeddings(model=model, device=device)
@@ -671,10 +645,11 @@ def load_local_embeddings(model: str = None, device: str = embedding_device()):
 
 def get_temp_dir(id: str = None) -> Tuple[str, str]:
     '''
-    创建一个临时目录，返回（路径，文件夹名称）
+
     '''
-    from configs.basic_config import BASE_TEMP_DIR
     import tempfile
+
+    from configs.basic_config import BASE_TEMP_DIR
 
     if id is not None:  # 如果指定的临时目录已存在，直接返回
         path = os.path.join(BASE_TEMP_DIR, id)

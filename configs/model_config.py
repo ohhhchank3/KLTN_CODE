@@ -48,7 +48,7 @@ MODEL_PATH = {
     },
 
     "llm_model": {
-        "MixSUra-SFT-AWQ": "ura-hcmut/MixSUra-SFT-AWQ",
+        "MixSUra-SFT-AWQ": "VietAI/gpt-neo-1.3B-vietnamese-news",
 
     },
 
@@ -62,7 +62,7 @@ MODEL_PATH = {
 NLTK_DATA_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "nltk_data")
 
 VLLM_MODEL_DICT = {
-    "MixSUra-SFT-AWQ": "ura-hcmut/MixSUra-SFT-AWQ",
+    "MixSUra-SFT-AWQ": "VietAI/gpt-neo-1.3B-vietnamese-news",
     "Llama-2-7b-chat-hf": "meta-llama/Llama-2-7b-chat-hf",
     "Llama-2-13b-chat-hf": "meta-llama/Llama-2-13b-chat-hf",
     "Llama-2-70b-chat-hf": "meta-llama/Llama-2-70b-chat-hf",
@@ -70,7 +70,7 @@ VLLM_MODEL_DICT = {
 }
 
 SUPPORT_AGENT_MODEL = [
-    "openai-api", 
-    "gemini-api", 
+    "openai-api",
+    "gemini-api",
     "MixSUra-SFT-AWQ",
 ]
