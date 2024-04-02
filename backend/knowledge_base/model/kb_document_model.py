@@ -4,7 +4,8 @@ from langchain.docstore.document import Document
 
 class DocumentWithVSId(Document):
     """
-    矢量化后的文档
+    
+Tài liệu được vector hóa
     """
     id: str = None
     score: float = 3.0

@@ -1,12 +1,16 @@
+import threading
+from collections import OrderedDict
+from contextlib import contextmanager
+from typing import Any, List, Tuple, Union
+
 from langchain.embeddings.base import Embeddings
 from langchain.vectorstores.faiss import FAISS
-import threading
-from configs import (EMBEDDING_MODEL, CHUNK_SIZE,
-                     logger, log_verbose)
-from server.utils import embedding_device, get_model_path, list_online_embed_models
-from contextlib import contextmanager
-from collections import OrderedDict
-from typing import List, Any, Union, Tuple
+
+from backend.utils import (embedding_device, get_model_path,
+                           list_online_embed_models)
+from configs.basic_config import log_verbose, logger
+from configs.kb_config import CHUNK_SIZE
+from configs.model_config import EMBEDDING_MODEL
 
 
 class ThreadSafeObject:
@@ -33,11 +37,11 @@ class ThreadSafeObject:
             if self._pool is not None:
                 self._pool._cache.move_to_end(self.key)
             if log_verbose:
-                logger.info(f"{owner} 开始操作：{self.key}。{msg}")
+                logger.info(f"{owner} bắt đầu hoạt động: {self.key}. {msg}")
             yield self._obj
         finally:
             if log_verbose:
-                logger.info(f"{owner} 结束操作：{self.key}。{msg}")
+                logger.info(f"{owner} kết thúc hoạt động: {self.key}. {msg}")
             self._lock.release()
 
     def start_loading(self):
@@ -91,7 +95,7 @@ class CachePool:
     def acquire(self, key: Union[str, Tuple], owner: str = "", msg: str = ""):
         cache = self.get(key)
         if cache is None:
-            raise RuntimeError(f"请求的资源 {key} 不存在")
+            raise RuntimeError(f"Resource {key} requested does not exist")
         elif isinstance(cache, ThreadSafeObject):
             self._cache.move_to_end(key)
             return cache.acquire(owner=owner, msg=msg)
@@ -104,8 +108,9 @@ class CachePool:
             embed_device: str = embedding_device(),
             default_embed_model: str = EMBEDDING_MODEL,
     ) -> Embeddings:
-        from server.db.repository.knowledge_base_repository import get_kb_detail
-        from server.knowledge_base.kb_service.base import EmbeddingsFunAdapter
+        from backend.db.repository.knowledge_base_repository import \
+            get_kb_detail
+        from backend.knowledge_base.kb_service.base import EmbeddingsFunAdapter
 
         kb_detail = get_kb_detail(kb_name)
         embed_model = kb_detail.get("embed_model", default_embed_model)
@@ -125,7 +130,7 @@ class EmbeddingsPool(CachePool):
         if not self.get(key):
             item = ThreadSafeObject(key, pool=self)
             self.set(key, item)
-            with item.acquire(msg="初始化"):
+            with item.acquire(msg="Initializing"):
                 self.atomic.release()
                 if model == "text-embedding-ada-002":  # openai text-embedding-ada-002
                     from langchain.embeddings.openai import OpenAIEmbeddings
@@ -136,7 +141,7 @@ class EmbeddingsPool(CachePool):
                     from langchain.embeddings import HuggingFaceBgeEmbeddings
                     if 'zh' in model:
                         # for chinese model
-                        query_instruction = "为这个句子生成表示以用于检索相关文章："
+                        query_instruction = "Đại diện cho câu này để tìm các đoạn văn liên quan:"
                     elif 'en' in model:
                         # for english model
                         query_instruction = "Represent this sentence for searching relevant passages:"
@@ -149,7 +154,8 @@ class EmbeddingsPool(CachePool):
                     if model == "bge-large-zh-noinstruct":  # bge large -noinstruct embedding
                         embeddings.query_instruction = ""
                 else:
-                    from langchain.embeddings.huggingface import HuggingFaceEmbeddings
+                    from langchain.embeddings.huggingface import \
+                        HuggingFaceEmbeddings
                     embeddings = HuggingFaceEmbeddings(model_name=get_model_path(model),
                                                        model_kwargs={'device': device})
                 item.obj = embeddings

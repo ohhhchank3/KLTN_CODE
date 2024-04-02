@@ -1,11 +1,14 @@
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
+
 from langchain.embeddings.base import Embeddings
 from langchain.schema import Document
 from langchain.vectorstores import Zilliz
-from configs import kbs_config
-from server.knowledge_base.kb_service.base import KBService, SupportedVSType, EmbeddingsFunAdapter, \
-    score_threshold_process
-from server.knowledge_base.utils import KnowledgeFile
+
+from backend.knowledge_base.kb_service.base import (EmbeddingsFunAdapter,
+                                                    KBService, SupportedVSType,
+                                                    score_threshold_process)
+from backend.knowledge_base.utils import KnowledgeFile
+from configs.kb_config import kbs_config
 
 
 class ZillizKBService(KBService):
@@ -91,7 +94,7 @@ class ZillizKBService(KBService):
 
 
 if __name__ == '__main__':
-    from server.db.base import Base, engine
+    from backend.db.base import Base, engine
 
     Base.metadata.create_all(bind=engine)
     zillizService = ZillizKBService("test")

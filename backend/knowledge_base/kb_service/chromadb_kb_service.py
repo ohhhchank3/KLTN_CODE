@@ -2,13 +2,14 @@ import uuid
 from typing import Any, Dict, List, Tuple
 
 import chromadb
-from chromadb.api.types import (GetResult, QueryResult)
+from chromadb.api.types import GetResult, QueryResult
 from langchain.docstore.document import Document
 
+from backend.knowledge_base.kb_service.base import (EmbeddingsFunAdapter,
+                                                    KBService, SupportedVSType)
+from backend.knowledge_base.utils import (KnowledgeFile, get_kb_path,
+                                          get_vs_path)
 from configs import SCORE_THRESHOLD
-from server.knowledge_base.kb_service.base import (EmbeddingsFunAdapter,
-                                                   KBService, SupportedVSType)
-from server.knowledge_base.utils import KnowledgeFile, get_kb_path, get_vs_path
 
 
 def _get_result_to_documents(get_result: GetResult) -> List[Document]:

@@ -1,13 +1,14 @@
-from configs import CACHED_VS_NUM, CACHED_MEMO_VS_NUM
-from server.knowledge_base.kb_cache.base import *
-from server.knowledge_base.kb_service.base import EmbeddingsFunAdapter
-from server.utils import load_local_embeddings
-from server.knowledge_base.utils import get_vs_path
-from langchain.vectorstores.faiss import FAISS
+import os
+
 from langchain.docstore.in_memory import InMemoryDocstore
 from langchain.schema import Document
-import os
-from langchain.schema import Document
+from langchain.vectorstores.faiss import FAISS
+
+from backend.knowledge_base.kb_cache.base import *
+from backend.knowledge_base.kb_service.base import EmbeddingsFunAdapter
+from backend.knowledge_base.utils import get_vs_path
+from backend.utils import load_local_embeddings
+from configs import CACHED_MEMO_VS_NUM, CACHED_VS_NUM
 
 
 # patch FAISS to include doc id in Document.metadata
@@ -35,7 +36,7 @@ class ThreadSafeFaiss(ThreadSafeObject):
             if not os.path.isdir(path) and create_path:
                 os.makedirs(path)
             ret = self._obj.save_local(path)
-            logger.info(f"已将向量库 {self.key} 保存到磁盘")
+            logger.info(f"Đã lưu vector store {self.key} vào đĩa")
         return ret
 
     def clear(self):
@@ -45,7 +46,7 @@ class ThreadSafeFaiss(ThreadSafeObject):
             if ids:
                 ret = self._obj.delete(ids)
                 assert len(self._obj.docstore._dict) == 0
-            logger.info(f"已将向量库 {self.key} 清空")
+            logger.info(f"Đã xóa toàn bộ vector trong {self.key}")
         return ret
 
 
@@ -69,7 +70,7 @@ class _FaissPool(CachePool):
     def unload_vector_store(self, kb_name: str):
         if cache := self.get(kb_name):
             self.pop(kb_name)
-            logger.info(f"成功释放向量库：{kb_name}")
+            logger.info(f"Đã giải phóng vector store: {kb_name}")
 
 
 class KBFaissPool(_FaissPool):
@@ -87,7 +88,7 @@ class KBFaissPool(_FaissPool):
         if cache is None:
             item = ThreadSafeFaiss((kb_name, vector_name), pool=self)
             self.set((kb_name, vector_name), item)
-            with item.acquire(msg="初始化"):
+            with item.acquire(msg="Initializing"):
                 self.atomic.release()
                 logger.info(f"loading vector store in '{kb_name}/vector_store/{vector_name}' from disk.")
                 vs_path = get_vs_path(kb_name, vector_name)
@@ -122,7 +123,7 @@ class MemoFaissPool(_FaissPool):
         if cache is None:
             item = ThreadSafeFaiss(kb_name, pool=self)
             self.set(kb_name, item)
-            with item.acquire(msg="初始化"):
+            with item.acquire(msg="Initializing"):
                 self.atomic.release()
                 logger.info(f"loading vector store in '{kb_name}' to memory.")
                 # create an empty vector store
@@ -139,7 +140,8 @@ memo_faiss_pool = MemoFaissPool(cache_num=CACHED_MEMO_VS_NUM)
 
 
 if __name__ == "__main__":
-    import time, random
+    import random
+    import time
     from pprint import pprint
 
     kb_names = ["vs1", "vs2", "vs3"]
@@ -160,7 +162,7 @@ if __name__ == "__main__":
                 docs = vs.similarity_search_with_score(f"{name}", k=3, score_threshold=1.0)
                 pprint(docs)
         if r == 3: # delete docs
-            logger.warning(f"清除 {vs_name} by {name}")
+            logger.warning(f"Clearing {vs_name} by {name}")
             kb_faiss_pool.get(vs_name).clear()
 
     threads = []
