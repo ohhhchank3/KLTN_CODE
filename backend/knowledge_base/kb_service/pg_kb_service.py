@@ -1,19 +1,19 @@
 import json
-from typing import List, Dict, Optional
-
-from langchain.schema import Document
-from langchain.vectorstores.pgvector import PGVector, DistanceStrategy
-from sqlalchemy import text
-
-from configs import kbs_config
-
-from server.knowledge_base.kb_service.base import SupportedVSType, KBService, EmbeddingsFunAdapter, \
-    score_threshold_process
-from server.knowledge_base.utils import KnowledgeFile
 import shutil
+from typing import Dict, List, Optional
+
 import sqlalchemy
+from langchain.schema import Document
+from langchain.vectorstores.pgvector import DistanceStrategy, PGVector
+from sqlalchemy import text
 from sqlalchemy.engine.base import Engine
 from sqlalchemy.orm import Session
+
+from backend.knowledge_base.kb_service.base import (EmbeddingsFunAdapter,
+                                                    KBService, SupportedVSType,
+                                                    score_threshold_process)
+from backend.knowledge_base.utils import KnowledgeFile
+from configs.kb_config import kbs_config
 
 
 class PGKBService(KBService):
@@ -47,12 +47,11 @@ class PGKBService(KBService):
     def do_drop_kb(self):
         with Session(PGKBService.engine) as session:
             session.execute(text(f'''
-                    -- 删除 langchain_pg_embedding 表中关联到 langchain_pg_collection 表中 的记录
                     DELETE FROM langchain_pg_embedding
                     WHERE collection_id IN (
                       SELECT uuid FROM langchain_pg_collection WHERE name = '{self.kb_name}'
                     );
-                    -- 删除 langchain_pg_collection 表中 记录
+                    
                     DELETE FROM langchain_pg_collection WHERE name = '{self.kb_name}';
             '''))
             session.commit()
@@ -83,7 +82,7 @@ class PGKBService(KBService):
 
 
 if __name__ == '__main__':
-    from server.db.base import Base, engine
+    from backend.db.base import Base, engine
 
     # Base.metadata.create_all(bind=engine)
     pGKBService = PGKBService("test")

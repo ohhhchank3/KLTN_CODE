@@ -1,29 +1,24 @@
-import os
-from configs import (
-    KB_ROOT_PATH,
-    CHUNK_SIZE,
-    OVERLAP_SIZE,
-    ZH_TITLE_ENHANCE,
-    logger,
-    log_verbose,
-    text_splitter_dict,
-    LLM_MODELS,
-    TEXT_SPLITTER_NAME,
-)
 import importlib
-from text_splitter import zh_title_enhance as func_zh_title_enhance
+import json
+import os
+from pathlib import Path
+from typing import Dict, Generator, List, Tuple, Union
+
+import chardet
 import langchain.document_loaders
 from langchain.docstore.document import Document
 from langchain.text_splitter import TextSplitter
-from pathlib import Path
-from server.utils import run_in_thread_pool, get_model_worker_config
-import json
-from typing import List, Union,Dict, Tuple, Generator
-import chardet
+
+from backend.utils import get_model_worker_config, run_in_thread_pool
+from configs.basic_config import log_verbose, logger
+from configs.kb_config import (CHUNK_SIZE, KB_ROOT_PATH, OVERLAP_SIZE,
+                               TEXT_SPLITTER_NAME, ZH_TITLE_ENHANCE,
+                               text_splitter_dict)
+from configs.model_config import LLM_MODELS
+from text_splitter import zh_title_enhance as func_zh_title_enhance
 
 
 def validate_kb_name(knowledge_base_id: str) -> bool:
-    # 检查是否包含预期外的字符或路径攻击关键字
     if "../" in knowledge_base_id:
         return False
     return True
@@ -71,7 +66,7 @@ def list_files_from_folder(kb_name: str):
                 for target_entry in target_it:
                     process_entry(target_entry)
         elif entry.is_file():
-            file_path = (Path(os.path.relpath(entry.path, doc_path)).as_posix()) # 路径统一为 posix 格式
+            file_path = (Path(os.path.relpath(entry.path, doc_path)).as_posix()) # Đường dẫn được chuẩn hóa sang định dạng posix
             result.append(file_path)
         elif entry.is_dir():
             with os.scandir(entry.path) as it:
@@ -91,7 +86,7 @@ LOADER_DICT = {"UnstructuredHTMLLoader": ['.html', '.htm'],
                "JSONLoader": [".json"],
                "JSONLinesLoader": [".jsonl"],
                "CSVLoader": [".csv"],
-               # "FilteredCSVLoader": [".csv"], 如果使用自定义分割csv
+               # "FilteredCSVLoader": [".csv"], Nếu sử dụng CSV tùy chỉnh
                "RapidOCRPDFLoader": [".pdf"],
                "RapidOCRDocLoader": ['.docx', '.doc'],
                "RapidOCRPPTLoader": ['.ppt', '.pptx', ],
@@ -130,7 +125,7 @@ if json.dumps is not _new_json_dumps:
 
 class JSONLinesLoader(langchain.document_loaders.JSONLoader):
     '''
-    行式 Json 加载器，要求文件扩展名为 .jsonl
+
     '''
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -147,7 +142,7 @@ def get_LoaderClass(file_extension):
 
 def get_loader(loader_name: str, file_path: str, loader_kwargs: Dict = None):
     '''
-    根据loader_name和文件路径或内容返回文档加载器。
+    Dựa trên loader_name và đường dẫn hoặc nội dung tệp, trả về trình tải tài liệu tương ứng.
     '''
     loader_kwargs = loader_kwargs or {}
     try:
@@ -158,7 +153,7 @@ def get_loader(loader_name: str, file_path: str, loader_kwargs: Dict = None):
             document_loaders_module = importlib.import_module('langchain.document_loaders')
         DocumentLoader = getattr(document_loaders_module, loader_name)
     except Exception as e:
-        msg = f"为文件{file_path}查找加载器{loader_name}时出错：{e}"
+        msg = f"Lỗi khi tìm tải liệu {loader_name} cho tệp {file_path}: {e}"
         logger.error(f'{e.__class__.__name__}: {msg}',
                      exc_info=e if log_verbose else None)
         document_loaders_module = importlib.import_module('langchain.document_loaders')
@@ -168,7 +163,7 @@ def get_loader(loader_name: str, file_path: str, loader_kwargs: Dict = None):
         loader_kwargs.setdefault("autodetect_encoding", True)
     elif loader_name == "CSVLoader":
         if not loader_kwargs.get("encoding"):
-            # 如果未指定 encoding，自动识别文件编码类型，避免langchain loader 加载文件报编码错误
+            # Nếu encoding không được chỉ định, tự động nhận dạng loại mã hóa tệp để tránh lỗi mã hóa khi tải tệp bằng trình tải của langchain
             with open(file_path, 'rb') as struct_file:
                 encode_detect = chardet.detect(struct_file.read())
             if encode_detect is None:
@@ -193,24 +188,24 @@ def make_text_splitter(
         llm_model: str = LLM_MODELS[0],
 ):
     """
-    根据参数获取特定的分词器
+    Dựa trên các tham số, trả về trình tách văn bản cụ thể.
     """
     splitter_name = splitter_name or "SpacyTextSplitter"
     try:
-        if splitter_name == "MarkdownHeaderTextSplitter":  # MarkdownHeaderTextSplitter特殊判定
+        if splitter_name == "MarkdownHeaderTextSplitter":  # Trường hợp đặc biệt của MarkdownHeaderTextSplitter
             headers_to_split_on = text_splitter_dict[splitter_name]['headers_to_split_on']
             text_splitter = langchain.text_splitter.MarkdownHeaderTextSplitter(
                 headers_to_split_on=headers_to_split_on)
         else:
 
-            try:  ## 优先使用用户自定义的text_splitter
+            try:  ## Ưu tiên sử dụng text_splitter người dùng tự định nghĩa
                 text_splitter_module = importlib.import_module('text_splitter')
                 TextSplitter = getattr(text_splitter_module, splitter_name)
-            except:  ## 否则使用langchain的text_splitter
+            except:  ## Nếu không, sử dụng text_splitter của langchain
                 text_splitter_module = importlib.import_module('langchain.text_splitter')
                 TextSplitter = getattr(text_splitter_module, splitter_name)
 
-            if text_splitter_dict[splitter_name]["source"] == "tiktoken":  ## 从tiktoken加载
+            if text_splitter_dict[splitter_name]["source"] == "tiktoken":  ## Tải từ tiktoken
                 try:
                     text_splitter = TextSplitter.from_tiktoken_encoder(
                         encoding_name=text_splitter_dict[splitter_name]["tokenizer_name_or_path"],
@@ -224,17 +219,17 @@ def make_text_splitter(
                         chunk_size=chunk_size,
                         chunk_overlap=chunk_overlap
                     )
-            elif text_splitter_dict[splitter_name]["source"] == "huggingface":  ## 从huggingface加载
+            elif text_splitter_dict[splitter_name]["source"] == "huggingface":  ## Tải từ huggingface
                 if text_splitter_dict[splitter_name]["tokenizer_name_or_path"] == "":
                     config = get_model_worker_config(llm_model)
                     text_splitter_dict[splitter_name]["tokenizer_name_or_path"] = \
                         config.get("model_path")
 
                 if text_splitter_dict[splitter_name]["tokenizer_name_or_path"] == "gpt2":
-                    from transformers import GPT2TokenizerFast
                     from langchain.text_splitter import CharacterTextSplitter
+                    from transformers import GPT2TokenizerFast
                     tokenizer = GPT2TokenizerFast.from_pretrained("gpt2")
-                else:  ## 字符长度加载
+                else:  ## Tải theo độ dài ký tự
                     from transformers import AutoTokenizer
                     tokenizer = AutoTokenizer.from_pretrained(
                         text_splitter_dict[splitter_name]["tokenizer_name_or_path"],
@@ -262,7 +257,7 @@ def make_text_splitter(
         TextSplitter = getattr(text_splitter_module, "RecursiveCharacterTextSplitter")
         text_splitter = TextSplitter(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
         
-    # If you use SpacyTextSplitter you can use GPU to do split likes Issue #1287
+    # Nếu sử dụng SpacyTextSplitter, bạn có thể sử dụng GPU để tách như vấn đề #1287
     # text_splitter._tokenizer.max_length = 37016792
     # text_splitter._tokenizer.prefer_gpu()
     return text_splitter
@@ -276,13 +271,13 @@ class KnowledgeFile:
             loader_kwargs: Dict = {},
     ):
         '''
-        对应知识库目录中的文件，必须是磁盘上存在的才能进行向量化等操作。
+        Đại diện cho tệp trong thư viện kiến thức, tệp phải tồn tại trên ổ đĩa để có thể thực hiện các hoạt động như tạo vector.
         '''
         self.kb_name = knowledge_base_name
         self.filename = str(Path(filename).as_posix())
         self.ext = os.path.splitext(filename)[-1].lower()
         if self.ext not in SUPPORTED_EXTS:
-            raise ValueError(f"暂未支持的文件格式 {self.filename}")
+            raise ValueError(f"Định dạng tệp {self.filename} chưa được hỗ trợ")
         self.loader_kwargs = loader_kwargs
         self.filepath = get_file_path(knowledge_base_name, filename)
         self.docs = None
@@ -292,7 +287,7 @@ class KnowledgeFile:
 
     def file2docs(self, refresh: bool = False):
         if self.docs is None or refresh:
-            logger.info(f"{self.document_loader_name} used for {self.filepath}")
+            logger.info(f"{self.document_loader_name} được sử dụng cho {self.filepath}")
             loader = get_loader(loader_name=self.document_loader_name,
                                 file_path=self.filepath,
                                 loader_kwargs=self.loader_kwargs)
@@ -323,7 +318,7 @@ class KnowledgeFile:
         if not docs:
             return []
 
-        print(f"文档切分示例：{docs[0]}")
+        print(f"Ví dụ chia văn bản: {docs[0]}")
         if zh_title_enhance:
             docs = func_zh_title_enhance(docs)
         self.splited_docs = docs
@@ -364,16 +359,16 @@ def files2docs_in_thread(
         zh_title_enhance: bool = ZH_TITLE_ENHANCE,
 ) -> Generator:
     '''
-    利用多线程批量将磁盘文件转化成langchain Document.
-    如果传入参数是Tuple，形式为(filename, kb_name)
-    生成器返回值为 status, (kb_name, file_name, docs | error)
+    Sử dụng luồng đa tiến trình để chuyển đổi các tệp trên ổ đĩa thành Document của langchain.
+    Nếu các đối số được chuyển đến là Tuple, có dạng (tên tệp, tên thư viện kiến thức)
+    Giá trị trả về của generator là status, (tên thư viện kiến thức, tên tệp, docs | lỗi)
     '''
 
     def file2docs(*, file: KnowledgeFile, **kwargs) -> Tuple[bool, Tuple[str, str, List[Document]]]:
         try:
             return True, (file.kb_name, file.filename, file.file2text(**kwargs))
         except Exception as e:
-            msg = f"从文件 {file.kb_name}/{file.filename} 加载文档时出错：{e}"
+            msg = f"Lỗi khi tải tài liệu từ tệp {file.kb_name}/{file.filename}: {e}"
             logger.error(f'{e.__class__.__name__}: {msg}',
                          exc_info=e if log_verbose else None)
             return False, (file.kb_name, file.filename, msg)
@@ -407,7 +402,7 @@ if __name__ == "__main__":
     from pprint import pprint
 
     kb_file = KnowledgeFile(
-        filename="/home/congyin/Code/Project_Langchain_0814/Langchain-Chatchat/knowledge_base/csv1/content/gm.csv",
+        filename="./knowledge_base/csv1/content/gm.csv",
         knowledge_base_name="samples")
     # kb_file.text_splitter_name = "RecursiveCharacterTextSplitter"
     docs = kb_file.file2docs()

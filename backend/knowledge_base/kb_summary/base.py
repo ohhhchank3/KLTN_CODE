@@ -1,16 +1,16 @@
-from typing import List
-
-from configs import (
-    EMBEDDING_MODEL,
-    KB_ROOT_PATH)
-
-from abc import ABC, abstractmethod
-from server.knowledge_base.kb_cache.faiss_cache import kb_faiss_pool, ThreadSafeFaiss
 import os
 import shutil
-from server.db.repository.knowledge_metadata_repository import add_summary_to_db, delete_summary_from_db
+from abc import ABC, abstractmethod
+from typing import List
 
 from langchain.docstore.document import Document
+
+from backend.db.repository.knowledge_metadata_repository import (
+    add_summary_to_db, delete_summary_from_db)
+from backend.knowledge_base.kb_cache.faiss_cache import (ThreadSafeFaiss,
+                                                         kb_faiss_pool)
+from configs.kb_config import KB_ROOT_PATH
+from configs.model_config import EMBEDDING_MODEL
 
 
 class KBSummaryService(ABC):
@@ -59,7 +59,7 @@ class KBSummaryService(ABC):
 
     def create_kb_summary(self):
         """
-        创建知识库chunk summary
+        Tạo tóm tắt chunk của thư viện kiến thức
         :return:
         """
 
@@ -68,7 +68,7 @@ class KBSummaryService(ABC):
 
     def drop_kb_summary(self):
         """
-        删除知识库chunk summary
+        Xóa tóm tắt chunk của thư viện kiến thức
         :param kb_name:
         :return:
         """

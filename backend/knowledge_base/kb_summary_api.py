@@ -1,17 +1,19 @@
-from fastapi import Body
-from configs import (DEFAULT_VS_TYPE, EMBEDDING_MODEL,
-                     OVERLAP_SIZE,
-                     logger, log_verbose, )
-from server.knowledge_base.utils import (list_files_from_folder)
-from sse_starlette import EventSourceResponse
 import json
-from server.knowledge_base.kb_service.base import KBServiceFactory
 from typing import List, Optional
-from server.knowledge_base.kb_summary.base import KBSummaryService
-from server.knowledge_base.kb_summary.summary_chunk import SummaryAdapter
-from server.utils import wrap_done, get_ChatOpenAI, BaseResponse
-from configs import LLM_MODELS, TEMPERATURE
-from server.knowledge_base.model.kb_document_model import DocumentWithVSId
+
+from fastapi import Body
+from sse_starlette import EventSourceResponse
+
+from backend.knowledge_base.kb_service.base import KBServiceFactory
+from backend.knowledge_base.kb_summary.base import KBSummaryService
+from backend.knowledge_base.kb_summary.summary_chunk import SummaryAdapter
+from backend.knowledge_base.model.kb_document_model import DocumentWithVSId
+from backend.knowledge_base.utils import list_files_from_folder
+from backend.utils import BaseResponse, get_ChatOpenAI, wrap_done
+from configs.basic_config import log_verbose, logger
+from configs.kb_config import DEFAULT_VS_TYPE, OVERLAP_SIZE
+from configs.model_config import EMBEDDING_MODEL, LLM_MODELS, TEMPERATURE
+
 
 def recreate_summary_vector_store(
         knowledge_base_name: str = Body(..., examples=["samples"]),
@@ -19,12 +21,12 @@ def recreate_summary_vector_store(
         vs_type: str = Body(DEFAULT_VS_TYPE),
         embed_model: str = Body(EMBEDDING_MODEL),
         file_description: str = Body(''),
-        model_name: str = Body(LLM_MODELS[0], description="LLM 模型名称。"),
-        temperature: float = Body(TEMPERATURE, description="LLM 采样温度", ge=0.0, le=1.0),
-        max_tokens: Optional[int] = Body(None, description="限制LLM生成Token数量，默认None代表模型最大值"),
+        model_name: str = Body(LLM_MODELS[0], description="Tên mô hình LLM."),
+        temperature: float = Body(TEMPERATURE, description="Nhiệt độ mẫu LLM", ge=0.0, le=1.0),
+        max_tokens: Optional[int] = Body(None, description="Giới hạn số lượng token được tạo ra bởi LLM, mặc định là None cho giá trị tối đa của mô hình"),
 ):
     """
-    重建单个知识库文件摘要
+    Tạo lại vector tóm tắt cho một tệp trong cơ sở kiến thức
     :param max_tokens:
     :param model_name:
     :param temperature:
@@ -40,9 +42,9 @@ def recreate_summary_vector_store(
 
         kb = KBServiceFactory.get_service(knowledge_base_name, vs_type, embed_model)
         if not kb.exists() and not allow_empty_kb:
-            yield {"code": 404, "msg": f"未找到知识库 ‘{knowledge_base_name}’"}
+            yield {"code": 404, "msg": f"Không tìm thấy cơ sở kiến thức ‘{knowledge_base_name}’"}
         else:
-            # 重新创建知识库
+            # Tạo lại cơ sở kiến thức
             kb_summary = KBSummaryService(knowledge_base_name, embed_model)
             kb_summary.drop_kb_summary()
             kb_summary.create_kb_summary()
@@ -57,7 +59,7 @@ def recreate_summary_vector_store(
                 temperature=temperature,
                 max_tokens=max_tokens,
             )
-            # 文本摘要适配器
+            # Bộ chuyển đổi tóm tắt văn bản
             summary = SummaryAdapter.form_summary(llm=llm,
                                                   reduce_llm=reduce_llm,
                                                   overlap_size=OVERLAP_SIZE)
@@ -72,7 +74,7 @@ def recreate_summary_vector_store(
 
                 status_kb_summary = kb_summary.add_kb_summary(summary_combine_docs=docs)
                 if status_kb_summary:
-                    logger.info(f"({i + 1} / {len(files)}): {file_name} 总结完成")
+                    logger.info(f"({i + 1} / {len(files)}): {file_name} Hoàn thành tóm tắt")
                     yield json.dumps({
                         "code": 200,
                         "msg": f"({i + 1} / {len(files)}): {file_name}",
@@ -82,7 +84,7 @@ def recreate_summary_vector_store(
                     }, ensure_ascii=False)
                 else:
 
-                    msg = f"知识库'{knowledge_base_name}'总结文件‘{file_name}’时出错。已跳过。"
+                    msg = f"Lỗi khi tóm tắt tệp '{file_name}' trong cơ sở kiến thức '{knowledge_base_name}'. Đã bỏ qua."
                     logger.error(msg)
                     yield json.dumps({
                         "code": 500,
@@ -100,12 +102,12 @@ def summary_file_to_vector_store(
         vs_type: str = Body(DEFAULT_VS_TYPE),
         embed_model: str = Body(EMBEDDING_MODEL),
         file_description: str = Body(''),
-        model_name: str = Body(LLM_MODELS[0], description="LLM 模型名称。"),
-        temperature: float = Body(TEMPERATURE, description="LLM 采样温度", ge=0.0, le=1.0),
-        max_tokens: Optional[int] = Body(None, description="限制LLM生成Token数量，默认None代表模型最大值"),
+        model_name: str = Body(LLM_MODELS[0], description="Tên mô hình LLM."),
+        temperature: float = Body(TEMPERATURE, description="Nhiệt độ mẫu LLM", ge=0.0, le=1.0),
+        max_tokens: Optional[int] = Body(None, description="Giới hạn số lượng token được tạo ra bởi LLM, mặc định là None cho giá trị tối đa của mô hình"),
 ):
     """
-    单个知识库根据文件名称摘要
+    Tóm tắt một tệp trong cơ sở kiến thức thành vector
     :param model_name:
     :param max_tokens:
     :param temperature:
@@ -121,9 +123,9 @@ def summary_file_to_vector_store(
     def output():
         kb = KBServiceFactory.get_service(knowledge_base_name, vs_type, embed_model)
         if not kb.exists() and not allow_empty_kb:
-            yield {"code": 404, "msg": f"未找到知识库 ‘{knowledge_base_name}’"}
+            yield {"code": 404, "msg": f"Không tìm thấy cơ sở kiến thức '{knowledge_base_name}'"}
         else:
-            # 重新创建知识库
+            # Tạo lại cơ sở kiến thức
             kb_summary = KBSummaryService(knowledge_base_name, embed_model)
             kb_summary.create_kb_summary()
 
@@ -137,7 +139,7 @@ def summary_file_to_vector_store(
                 temperature=temperature,
                 max_tokens=max_tokens,
             )
-            # 文本摘要适配器
+            # Bộ chuyển đổi tóm tắt văn bản
             summary = SummaryAdapter.form_summary(llm=llm,
                                                   reduce_llm=reduce_llm,
                                                   overlap_size=OVERLAP_SIZE)
@@ -148,15 +150,15 @@ def summary_file_to_vector_store(
 
             status_kb_summary = kb_summary.add_kb_summary(summary_combine_docs=docs)
             if status_kb_summary:
-                logger.info(f" {file_name} 总结完成")
+                logger.info(f" {file_name} Hoàn thành tóm tắt")
                 yield json.dumps({
                     "code": 200,
-                    "msg": f"{file_name} 总结完成",
+                    "msg": f"{file_name} Hoàn thành tóm tắt",
                     "doc": file_name,
                 }, ensure_ascii=False)
             else:
 
-                msg = f"知识库'{knowledge_base_name}'总结文件‘{file_name}’时出错。已跳过。"
+                msg = f"Lỗi khi tóm tắt tệp '{file_name}' trong cơ sở kiến thức '{knowledge_base_name}'. Đã bỏ qua."
                 logger.error(msg)
                 yield json.dumps({
                     "code": 500,
@@ -172,12 +174,12 @@ def summary_doc_ids_to_vector_store(
         vs_type: str = Body(DEFAULT_VS_TYPE),
         embed_model: str = Body(EMBEDDING_MODEL),
         file_description: str = Body(''),
-        model_name: str = Body(LLM_MODELS[0], description="LLM 模型名称。"),
-        temperature: float = Body(TEMPERATURE, description="LLM 采样温度", ge=0.0, le=1.0),
-        max_tokens: Optional[int] = Body(None, description="限制LLM生成Token数量，默认None代表模型最大值"),
+        model_name: str = Body(LLM_MODELS[0], description="Tên mô hình LLM."),
+        temperature: float = Body(TEMPERATURE, description="Nhiệt độ mẫu LLM", ge=0.0, le=1.0),
+        max_tokens: Optional[int] = Body(None, description="Giới hạn số lượng token được tạo ra bởi LLM, mặc định là None cho giá trị tối đa của mô hình"),
 ) -> BaseResponse:
     """
-    单个知识库根据doc_ids摘要
+    Tóm tắt các tài liệu trong cơ sở kiến thức dựa trên doc_ids
     :param knowledge_base_name:
     :param doc_ids:
     :param model_name:
@@ -190,7 +192,7 @@ def summary_doc_ids_to_vector_store(
     """
     kb = KBServiceFactory.get_service(knowledge_base_name, vs_type, embed_model)
     if not kb.exists():
-        return BaseResponse(code=404, msg=f"未找到知识库 {knowledge_base_name}", data={})
+        return BaseResponse(code=404, msg=f"Không tìm thấy cơ sở kiến thức {knowledge_base_name}", data={})
     else:
         llm = get_ChatOpenAI(
             model_name=model_name,
@@ -202,19 +204,19 @@ def summary_doc_ids_to_vector_store(
             temperature=temperature,
             max_tokens=max_tokens,
         )
-        # 文本摘要适配器
+        # Bộ chuyển đổi tóm tắt văn bản
         summary = SummaryAdapter.form_summary(llm=llm,
                                               reduce_llm=reduce_llm,
                                               overlap_size=OVERLAP_SIZE)
 
         doc_infos = kb.get_doc_by_ids(ids=doc_ids)
-        # doc_infos转换成DocumentWithVSId包装的对象
+        # Chuyển đổi doc_infos thành các đối tượng được bao gói DocumentWithVSId
         doc_info_with_ids = [DocumentWithVSId(**doc.dict(), id=with_id) for with_id, doc in zip(doc_ids, doc_infos)]
 
         docs = summary.summarize(file_description=file_description,
                                  docs=doc_info_with_ids)
 
-        # 将docs转换成dict
+        # Chuyển đổi docs thành dict
         resp_summarize = [{**doc.dict()} for doc in docs]
 
-        return BaseResponse(code=200, msg="总结完成", data={"summarize": resp_summarize})
+        return BaseResponse(code=200, msg="Hoàn thành tóm tắt", data={"summarize": resp_summarize})

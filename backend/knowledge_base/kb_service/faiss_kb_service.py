@@ -2,10 +2,10 @@ import os
 import shutil
 
 from configs import SCORE_THRESHOLD
-from server.knowledge_base.kb_service.base import KBService, SupportedVSType, EmbeddingsFunAdapter
-from server.knowledge_base.kb_cache.faiss_cache import kb_faiss_pool, ThreadSafeFaiss
-from server.knowledge_base.utils import KnowledgeFile, get_kb_path, get_vs_path
-from server.utils import torch_gc
+from backend.knowledge_base.kb_service.base import KBService, SupportedVSType, EmbeddingsFunAdapter
+from backend.knowledge_base.kb_cache.faiss_cache import kb_faiss_pool, ThreadSafeFaiss
+from backend.knowledge_base.utils import KnowledgeFile, get_kb_path, get_vs_path
+from backend.utils import torch_gc
 from langchain.docstore.document import Document
 from typing import List, Dict, Optional, Tuple
 
@@ -72,7 +72,7 @@ class FaissKBService(KBService):
                    docs: List[Document],
                    **kwargs,
                    ) -> List[Dict]:
-        data = self._docs_to_embeddings(docs) # 将向量化单独出来可以减少向量库的锁定时间
+        data = self._docs_to_embeddings(docs)
 
         with self.load_vector_store().acquire() as vs:
             ids = vs.add_embeddings(text_embeddings=zip(data["texts"], data["embeddings"]),
@@ -120,4 +120,4 @@ if __name__ == '__main__':
     faissService.add_doc(KnowledgeFile("README.md", "test"))
     faissService.delete_doc(KnowledgeFile("README.md", "test"))
     faissService.do_drop_kb()
-    print(faissService.search_docs("如何启动api服务"))
+    print(faissService.search_docs("Làm thế nào để bắt đầu dịch vụ API"))

@@ -1,24 +1,25 @@
-from configs import (
-    EMBEDDING_MODEL, DEFAULT_VS_TYPE, ZH_TITLE_ENHANCE,
-    CHUNK_SIZE, OVERLAP_SIZE,
-    logger, log_verbose
-)
-from server.knowledge_base.utils import (
-    get_file_path, list_kbs_from_folder,
-    list_files_from_folder, files2docs_in_thread,
-    KnowledgeFile
-)
-from server.knowledge_base.kb_service.base import KBServiceFactory
-from server.db.models.conversation_model import ConversationModel
-from server.db.models.message_model import MessageModel
-from server.db.repository.knowledge_file_repository import add_file_to_db # ensure Models are imported
-from server.db.repository.knowledge_metadata_repository import add_summary_to_db
-
-from server.db.base import Base, engine
-from server.db.session import session_scope
 import os
+from typing import List, Literal
+
 from dateutil.parser import parse
-from typing import Literal, List
+
+from backend.db.base import Base, engine
+from backend.db.models.conversation_model import ConversationModel
+from backend.db.models.message_model import MessageModel
+from backend.db.repository.knowledge_file_repository import \
+    add_file_to_db  # ensure Models are imported
+from backend.db.repository.knowledge_metadata_repository import \
+    add_summary_to_db
+from backend.db.session import session_scope
+from backend.knowledge_base.kb_service.base import KBServiceFactory
+from backend.knowledge_base.utils import (KnowledgeFile, files2docs_in_thread,
+                                          get_file_path,
+                                          list_files_from_folder,
+                                          list_kbs_from_folder)
+from configs.basic_config import log_verbose, logger
+from configs.kb_config import (CHUNK_SIZE, DEFAULT_VS_TYPE, OVERLAP_SIZE,
+                               ZH_TITLE_ENHANCE)
+from configs.model_config import EMBEDDING_MODEL
 
 
 def create_tables():
@@ -35,10 +36,11 @@ def import_from_db(
         # csv_path: str = None,
 ) -> bool:
     """
-    在知识库与向量库无变化的情况下，从备份数据库中导入数据到 info.db。
-    适用于版本升级时，info.db 结构变化，但无需重新向量化的情况。
-    请确保两边数据库表名一致，需要导入的字段名一致
-    当前仅支持 sqlite
+    Trong trường hợp không có thay đổi nào trong cơ sở kiến thức và bộ lưu trữ vector, nhập dữ liệu từ cơ sở dữ liệu sao lưu vào info.db.
+    Được sử dụng khi nâng cấp phiên bản, cấu trúc info.db thay đổi, nhưng không cần tạo lại vector hóa.
+    Hãy đảm bảo rằng tên bảng trong cơ sở dữ liệu backup và cơ sở dữ liệu cần nhập có tên giống nhau,
+    cũng như tên các trường cần nhập cũng phải giống nhau.
+    Hiện tại chỉ hỗ trợ sqlite.
     """
     import sqlite3 as sql
     from pprint import pprint
@@ -65,7 +67,7 @@ def import_from_db(
         con.close()
         return True
     except Exception as e:
-        print(f"无法读取备份数据库：{sqlite_path}。错误信息：{e}")
+        print(f"Không thể đọc cơ sở dữ liệu sao lưu: {sqlite_path}. Lỗi: {e}")
         return False
 
 
@@ -76,7 +78,7 @@ def file_to_kbfile(kb_name: str, files: List[str]) -> List[KnowledgeFile]:
             kb_file = KnowledgeFile(filename=file, knowledge_base_name=kb_name)
             kb_files.append(kb_file)
         except Exception as e:
-            msg = f"{e}，已跳过"
+            msg = f"{e}, đã bỏ qua"
             logger.error(f'{e.__class__.__name__}: {msg}',
                          exc_info=e if log_verbose else None)
     return kb_files
@@ -92,12 +94,11 @@ def folder2db(
         zh_title_enhance: bool = ZH_TITLE_ENHANCE,
 ):
     """
-    use existed files in local folder to populate database and/or vector store.
-    set parameter `mode` to:
-        recreate_vs: recreate all vector store and fill info to database using existed files in local folder
-        fill_info_only(disabled): do not create vector store, fill info to db using existed files only
-        update_in_db: update vector store and database info using local files that existed in database only
-        increment: create vector store and database info for local files that not existed in database only
+    Sử dụng các tệp đã tồn tại trong thư mục cục bộ để điền dữ liệu vào cơ sở dữ liệu và/hoặc bộ lưu trữ vector.
+    Thiết lập tham số `mode` thành:
+        recreate_vs: tạo lại tất cả các vector hóa và điền thông tin vào cơ sở dữ liệu bằng các tệp đã tồn tại trong thư mục cục bộ
+        update_in_db: cập nhật vector hóa và thông tin cơ sở dữ liệu bằng các tệp cục bộ chỉ tồn tại trong cơ sở dữ liệu
+        increment: tạo vector hóa và thông tin cơ sở dữ liệu cho các tệp cục bộ chỉ tồn tại trong cơ sở dữ liệu
     """
 
     def files2vs(kb_name: str, kb_files: List[KnowledgeFile]):
@@ -107,7 +108,7 @@ def folder2db(
                                                     zh_title_enhance=zh_title_enhance):
             if success:
                 _, filename, docs = result
-                print(f"正在将 {kb_name}/{filename} 添加到向量库，共包含{len(docs)}条文档")
+                print(f"Đang thêm {kb_name}/{filename} vào bộ lưu trữ vector, tổng cộng {len(docs)} tài liệu")
                 kb_file = KnowledgeFile(filename=filename, knowledge_base_name=kb_name)
                 kb_file.splited_docs = docs
                 kb.add_doc(kb_file=kb_file, not_refresh_vs_cache=True)
@@ -120,28 +121,18 @@ def folder2db(
         if not kb.exists():
             kb.create_kb()
 
-        # 清除向量库，从本地文件重建
+        # Xóa bộ lưu trữ vector, tạo lại từ các tệp cục bộ
         if mode == "recreate_vs":
             kb.clear_vs()
             kb.create_kb()
             kb_files = file_to_kbfile(kb_name, list_files_from_folder(kb_name))
             files2vs(kb_name, kb_files)
             kb.save_vector_store()
-        # # 不做文件内容的向量化，仅将文件元信息存到数据库
-        # # 由于现在数据库存了很多与文本切分相关的信息，单纯存储文件信息意义不大，该功能取消。
-        # elif mode == "fill_info_only":
-        #     files = list_files_from_folder(kb_name)
-        #     kb_files = file_to_kbfile(kb_name, files)
-        #     for kb_file in kb_files:
-        #         add_file_to_db(kb_file)
-        #         print(f"已将 {kb_name}/{kb_file.filename} 添加到数据库")
-        # 以数据库中文件列表为基准，利用本地文件更新向量库
         elif mode == "update_in_db":
             files = kb.list_files()
             kb_files = file_to_kbfile(kb_name, files)
             files2vs(kb_name, kb_files)
             kb.save_vector_store()
-        # 对比本地目录与数据库中的文件列表，进行增量向量化
         elif mode == "increment":
             db_files = kb.list_files()
             folder_files = list_files_from_folder(kb_name)
@@ -150,13 +141,13 @@ def folder2db(
             files2vs(kb_name, kb_files)
             kb.save_vector_store()
         else:
-            print(f"unsupported migrate mode: {mode}")
+            print(f"Chế độ di chuyển không được hỗ trợ: {mode}")
 
 
 def prune_db_docs(kb_names: List[str]):
     """
-    delete docs in database that not existed in local folder.
-    it is used to delete database docs after user deleted some doc files in file browser
+    Xóa các tài liệu trong cơ sở dữ liệu không tồn tại trong thư mục cục bộ.
+    Được sử dụng để xóa các tài liệu trong cơ sở dữ liệu sau khi người dùng xóa một số tệp tài liệu trong trình duyệt tệp.
     """
     for kb_name in kb_names:
         kb = KBServiceFactory.get_service_by_name(kb_name)
@@ -167,14 +158,13 @@ def prune_db_docs(kb_names: List[str]):
             kb_files = file_to_kbfile(kb_name, files)
             for kb_file in kb_files:
                 kb.delete_doc(kb_file, not_refresh_vs_cache=True)
-                print(f"success to delete docs for file: {kb_name}/{kb_file.filename}")
-            kb.save_vector_store()
+                print(f"Xóa tài liệu thành công cho tệp: {kb_name}/{kb_file.filename}")
 
 
 def prune_folder_files(kb_names: List[str]):
     """
-    delete doc files in local folder that not existed in database.
-    it is used to free local disk space by delete unused doc files.
+    Xóa các tệp tài liệu trong thư mục cục bộ không tồn tại trong cơ sở dữ liệu.
+    Được sử dụng để giải phóng không gian đĩa cục bộ bằng cách xóa các tệp tài liệu không sử dụng.
     """
     for kb_name in kb_names:
         kb = KBServiceFactory.get_service_by_name(kb_name)
@@ -184,4 +174,4 @@ def prune_folder_files(kb_names: List[str]):
             files = list(set(files_in_folder) - set(files_in_db))
             for file in files:
                 os.remove(get_file_path(kb_name, file))
-                print(f"success to delete file: {kb_name}/{file}")
+                print(f"Xóa tệp thành công: {kb_name}/{file}")
